@@ -55,6 +55,7 @@ An item based pets plugin made to hook into various of my other plugins
 - `petsadmin list` Opens the pet list menu
 - `petsadmin reload [arg]` Reloads this plugin or a specified portion
 - `petsadmin resetData` Deletes all selected pets from the database
+- `petsadmin rewardInfo <petID> <rewardID>` Print out a pet's reward information
 
 ### Notes
 - Right-clicking while crouching with a pet in the main hand will put it in the `/pets` menu
