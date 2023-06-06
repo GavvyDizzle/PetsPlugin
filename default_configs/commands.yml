@@ -1,0 +1,21 @@
+commandDisplayName:
+  admin: petadmin
+helpCommandPadding:
+  admin: '&6-----(PetsPlugin) Admin Commands)-----'
+descriptions:
+  admin:
+    spawn: Teleport to a mine's spawn
+    setName: Change a mine's display name
+    setSpawnLocation: Change a mine's spawn location
+    reset: Reset one or all mines
+    setMaxWeight: Set a mine's max weight
+    cloneContents: Clone the block list from one mine to another
+    create: 'Create a new mine (optional: clone block list)'
+    delete: Delete a mine
+    help: Opens this help menu
+    list: View all mines
+    panel: Open a mine menu
+    reload: Reloads this plugin or a specified portion
+    resize: Resize a mine
+    setMineName: Change a mine's display name
+    setResetTime: Change the reset time

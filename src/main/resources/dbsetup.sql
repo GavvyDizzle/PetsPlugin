@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS selected_pets
+(
+    uuid BINARY(16)   NOT NULL,
+    petID VARCHAR(32) NOT NULL,
+    xp BIGINT DEFAULT 0,
+    PRIMARY KEY (uuid)
+);

@@ -1,0 +1,12 @@
+# Removes dropped items in the mine region
+# Stops blocks from appearing on the top of the mine after a reset
+removeDroppedItemsOnMineReset: true
+# Disables the player /mine <id> command
+disableMineCommand: false
+# If the mine should reset if no blocks have been mined. False means it will not reset
+resetWhenMineFull: false
+# Times to send mine reset messages to players in the mine
+resetMessageSeconds:
+- 10
+- 5
+- 1

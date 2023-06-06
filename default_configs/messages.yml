@@ -1,0 +1,7 @@
+invalidMineId: '&cNo mine exists with the id: {id}'
+cannotAccessMine: '&eYou don''t have permission to access this mine'
+noSpawnLocation: '&cNo spawn location found for mine {id}'
+teleportedToMineSpawn: '&aTeleported to {mine_name} &aspawn'
+mineResetCountdown: '{mine_name} resetting in {time} seconds'
+# Only sent if a time of 1 second is used for mine reset messages
+mineResetCountdownSingular: '{mine_name} resetting in 1 second'

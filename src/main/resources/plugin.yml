@@ -1,0 +1,16 @@
+name: PetsPlugin
+version: '${project.version}'
+main: com.github.gavvydizzle.petsplugin.PetsPlugin
+api-version: 1.19
+softdepend: [RewardsInventory]
+depend: [MineRewards, PlayerLevels, PrisonEnchants, PrisonMines, ServerUtils]
+authors: [GavvyDizzle]
+commands:
+  petsadmin:
+    description: PetsPlugin admin commands
+    permission: petsplugin.petsadmin
+  pets:
+    aliases: [pet]
+    description: PrisonMines player commands
+    permission: petsplugin.pets
+    permission-message: Insufficient permission
