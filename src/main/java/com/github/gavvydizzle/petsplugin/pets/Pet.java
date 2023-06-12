@@ -39,7 +39,7 @@ public class Pet implements Comparable<Pet> {
         }
 
         totalXpNeeded = new long[xpPerLevel.length];
-        totalXpNeeded[0] = xpPerLevel[0];
+        if (totalXpNeeded.length > 0) totalXpNeeded[0] = xpPerLevel[0];
         for (int i = 1; i < xpPerLevel.length; i++) {
             totalXpNeeded[i] = totalXpNeeded[i-1] + xpPerLevel[i];
         }
@@ -85,7 +85,7 @@ public class Pet implements Comparable<Pet> {
      * @return The pet's level
      */
     public int getLevel(long xp) {
-        if (xp < totalXpNeeded[0]) return startLevel;
+        if (startLevel == maxLevel || xp < totalXpNeeded[0]) return startLevel;
 
         int level = Arrays.binarySearch(totalXpNeeded, xp+1); // Add 1 to the key to make boundary points count as the next level
         if (level < 0) level = -level - 1;
