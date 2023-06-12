@@ -320,7 +320,9 @@ public class PetManager implements Listener {
                         continue;
                     }
 
-                    pet.addBoost(new XpBoost(key, multiplierEquation));
+                    isMultiplicative = config.getBoolean(path + ".isMultiplicative");
+
+                    pet.addBoost(new XpBoost(key, multiplierEquation, isMultiplicative));
                 }
             }
         }
@@ -460,10 +462,10 @@ public class PetManager implements Listener {
             GeneralRewardBoost b = (GeneralRewardBoost) boost;
 
             if (b.isMultiplicative()) {
-                e.multiplyRewardMultiplier(b.getMultiplier(level));
+                e.multiply(b.getMultiplier(level));
             }
             else {
-                e.setRewardMultiplier(e.getRewardMultiplier() + b.getMultiplier(level));
+                e.add(b.getMultiplier(level));
             }
         }
     }
@@ -506,7 +508,13 @@ public class PetManager implements Listener {
 
         for (Boost boost : pet.getBoostsByType(BoostType.XP)) {
             XpBoost b = (XpBoost) boost;
-            e.multiplyXp(b.getMultiplier(newLevel));
+
+            if (b.isMultiplicative()) {
+                e.multiply(b.getMultiplier(newLevel));
+            }
+            else {
+                e.add(b.getMultiplier(newLevel));
+            }
         }
 
         if (oldLevel != newLevel) {

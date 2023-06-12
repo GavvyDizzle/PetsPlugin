@@ -115,13 +115,13 @@
         <dependency>
             <groupId>me.gavvydizzle</groupId>
             <artifactId>PlayerLevels</artifactId>
-            <version>1.3.1</version>
+            <version>1.3.3</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>me.gavvydizzle</groupId>
             <artifactId>MineRewards</artifactId>
-            <version>1.1.2</version>
+            <version>1.1.3</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

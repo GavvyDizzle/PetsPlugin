@@ -5,10 +5,12 @@ import com.github.mittenmc.serverutils.Numbers;
 public class XpBoost extends Boost {
 
     private final String multiplierEquation;
+    private final boolean isMultiplicative;
 
-    public XpBoost(String id, String multiplierEquation) {
+    public XpBoost(String id, String multiplierEquation, boolean isMultiplicative) {
         super(BoostType.XP, id);
         this.multiplierEquation = multiplierEquation;
+        this.isMultiplicative = isMultiplicative;
     }
 
     /**
@@ -22,5 +24,9 @@ public class XpBoost extends Boost {
 
     public double getMultiplier(int level) {
         return Numbers.eval(multiplierEquation.replace("x", String.valueOf(level)));
+    }
+
+    public boolean isMultiplicative() {
+        return isMultiplicative;
     }
 }
