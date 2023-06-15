@@ -30,6 +30,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -260,7 +261,30 @@ public class PetManager implements Listener {
                 String multiplierEquation;
                 boolean isMultiplicative;
 
-                if (boostType == BoostType.DOUBLE_REWARD) {
+                if (boostType == BoostType.DAMAGE) {
+                    multiplierEquation = config.getString(path + ".multiplier");
+                    if (multiplierEquation == null) {
+                        instance.getLogger().severe("Multiplier missing " + file.getName() + " " + path);
+                        continue;
+                    }
+
+                    boolean allowAll = config.getBoolean(path + ".allowAll");
+                    if (allowAll) {
+                        pet.addBoost(new DamageBoost(key, null, multiplierEquation));
+                    }
+                    else {
+                        ArrayList<EntityType> entityTypes = new ArrayList<>();
+                        for (String s : config.getStringList(path + ".whitelist")) {
+                            try {
+                                entityTypes.add(EntityType.valueOf(s.toUpperCase()));
+                            } catch (Exception ignored) {
+                                instance.getLogger().warning("Invalid EntityType '" + s + "' at " + file.getName() + " " + path + ".whitelist");
+                            }
+                        }
+                        pet.addBoost(new DamageBoost(key, entityTypes, multiplierEquation));
+                    }
+                }
+                else if (boostType == BoostType.DOUBLE_REWARD) {
                     String rewardID = config.getString(path + ".rewardID");
                     if (rewardID == null) {
                         instance.getLogger().severe("Reward ID missing " + file.getName() + " " + path);
@@ -521,6 +545,25 @@ public class PetManager implements Listener {
             if (Messages.petLevelUpMessage.length() > 0) {
                 e.getPlayer().sendMessage(Messages.petLevelUpMessage.replace("{pet_name}", pet.getPetName(newLevel)));
                 Sounds.petLevelUpSound.playSound(e.getPlayer());
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    private void onEntityDamage(EntityDamageByEntityEvent e) {
+        if (!(e.getDamager() instanceof Player)) return;
+        Player player = (Player) e.getDamager();
+
+        Pet pet = getSelectedPet(player);
+        if (pet == null) return;
+
+        SelectedPet selectedPet = selectedPets.get(player.getUniqueId());
+        int level = pet.getLevel(selectedPet.getXp());
+
+        for (Boost boost : pet.getBoostsByType(BoostType.DAMAGE)) {
+            DamageBoost b = (DamageBoost) boost;
+            if (b.shouldBoostDamage(e.getEntityType())) {
+                e.setDamage(e.getDamage() * b.getMultiplier(level));
             }
         }
     }

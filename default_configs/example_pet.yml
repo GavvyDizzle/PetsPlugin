@@ -17,23 +17,30 @@ item:
     - '&7- &aXP Boost: {boost_5}%'
 boosts:
   '1':
+    type: DAMAGE
+    multiplier: 1.1
+    allowAll: false
+    whitelist:
+      - SKELETON
+      - ZOMBIE
+  '2':
     type: DOUBLE_REWARD
     rewardID: common_shard
     percent: 0.04*x + 3
-  '2':
+  '3':
     type: GENERAL_REWARD
     multiplier: 0.0002*x + 1.01
     isMultiplicative: true
-  '3':
+  '4':
     type: ENCHANT
     enchant: PYROTECHNIC
     multiplier: 0.0004*x + 1.03
     isMultiplicative: true
-  '4':
+  '5':
     type: POTION_EFFECT
     effect: SPEED
     amplifier: 0
-  '5':
+  '6':
     type: XP
     multiplier: 0.0002*x + 1.01
 rewards:
@@ -67,8 +74,8 @@ rewards:
     type: KILL
     allowAll: false
     whitelist:
-      - PIG
-      - COW
+      - SKELETON
+      - CREEPER
     rewardChance: 1
     rewards:
       '1':

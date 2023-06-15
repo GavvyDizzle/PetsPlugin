@@ -24,6 +24,7 @@ An item based pets plugin made to hook into various of my other plugins
   - If you do not specify the right amount, the plugin will print a warning to the console
 #### Boosts
 - Pets support 5 types of boosts. You can specify as many as you want
+- `type: DAMAGE` Multiply damage dealt to all entities or specified type(s)
 - `type: DOUBLE_REWARD` Chance to give 2 rewards instead of one (MineRewards)
 - `type: GENERAL_REWARD` Increase general reward chance (MineRewards)
 - `type: ENCHANT` Increase the chance of an enchant activating (PrisonEnchants)

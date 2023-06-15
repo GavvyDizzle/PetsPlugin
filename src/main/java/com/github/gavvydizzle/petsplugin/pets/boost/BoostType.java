@@ -4,6 +4,7 @@ import javax.annotation.Nullable;
 
 public enum BoostType {
 
+    DAMAGE,
     DOUBLE_REWARD,
     GENERAL_REWARD,
     ENCHANT,
