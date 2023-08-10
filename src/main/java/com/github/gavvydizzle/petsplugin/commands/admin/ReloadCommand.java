@@ -42,32 +42,31 @@ public class ReloadCommand extends SubCommand {
     public void perform(CommandSender sender, String[] args) {
         if (args.length >= 2) {
             switch (args[1].toLowerCase()) {
-                case "commands":
+                case "commands" -> {
                     reloadCommands();
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded commands");
-                    break;
-                case "gui":
+                }
+                case "gui" -> {
                     reloadGUI();
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded all GUIs");
-                    break;
-                case "messages":
+                }
+                case "messages" -> {
                     reloadMessages();
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded all messages");
-                    break;
-                case "pets":
-                    reloadPets();
+                }
+                case "pets" -> {
+                    reloadPets(true);
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded all pets");
-                    break;
-                case "sounds":
+                }
+                case "sounds" -> {
                     reloadSounds();
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded all sounds");
-                    break;
-
+                }
             }
         }
         else {
             reloadCommands();
-            reloadPets(); // Must reload before GUI
+            reloadPets(false); // Must reload before GUI
             reloadGUI();
             reloadMessages();
             reloadSounds();
@@ -101,10 +100,12 @@ public class ReloadCommand extends SubCommand {
         Messages.reloadMessages();
     }
 
-    private void reloadPets() {
+    private void reloadPets(boolean updateMenuPets) {
         PetsPlugin.getInstance().reloadConfig();
         PetsPlugin.getInstance().getPetManager().reload();
-        PetsPlugin.getInstance().getInventoryManager().getPetListMenu().reloadContents();
+        PetsPlugin.getInstance().getInventoryManager().getPetListAdminMenu().reloadContents();
+
+        if (updateMenuPets) PetsPlugin.getInstance().getInventoryManager().updatePetItems();
     }
 
     private void reloadSounds() {

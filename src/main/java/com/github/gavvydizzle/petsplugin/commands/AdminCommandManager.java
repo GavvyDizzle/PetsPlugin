@@ -20,8 +20,7 @@ public class AdminCommandManager extends CommandManager {
     private final CommandConfirmationManager confirmationManager;
     private String helpCommandPadding;
 
-    public AdminCommandManager(PluginCommand command, CommandConfirmationManager confirmationManager,
-                               PetManager petManager, InventoryManager inventoryManager, PlayerData data) {
+    public AdminCommandManager(PluginCommand command, CommandConfirmationManager confirmationManager, PetManager petManager, InventoryManager inventoryManager, PlayerData data) {
         super(command);
         this.confirmationManager = confirmationManager;
 
@@ -30,12 +29,14 @@ public class AdminCommandManager extends CommandManager {
         }
         registerCommand(new AdminConfirmCommand(this));
         registerCommand(new AdminHelpCommand(this));
+        registerCommand(new DeselectPetCommand(this, petManager));
         registerCommand(new GiveToPlayerCommand(this, petManager));
         registerCommand(new OpenPetListCommand(this, inventoryManager));
         registerCommand(new PetInfoCommand(this));
         registerCommand(new PetRewardInfoCommand(this, petManager));
         registerCommand(new ReloadCommand(this));
         registerCommand(new ResetDatabaseCommand(this, petManager, data));
+        registerCommand(new SetPetXPCommand(this, petManager));
         sortCommands();
 
         reload();

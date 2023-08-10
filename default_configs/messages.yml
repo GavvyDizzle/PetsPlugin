@@ -1,7 +1,9 @@
-invalidMineId: '&cNo mine exists with the id: {id}'
-cannotAccessMine: '&eYou don''t have permission to access this mine'
-noSpawnLocation: '&cNo spawn location found for mine {id}'
-teleportedToMineSpawn: '&aTeleported to {mine_name} &aspawn'
-mineResetCountdown: '{mine_name} resetting in {time} seconds'
-# Only sent if a time of 1 second is used for mine reset messages
-mineResetCountdownSingular: '{mine_name} resetting in 1 second'
+petLevelUpMessage: '&aYour {pet_name} &ajust levelled up!'
+swappingPetTooFast: '&cPlease wait to swap your pet!'
+selectedPetInvalid: '&cYour selected pet is invalid (id={id}). Please alert a staff
+  member!'
+notPetOwnerOnSelect: '&cYou can only select a pet that belongs to you!'
+inventoryFullOnPetSelect: '&cInventory full. Cannot retrieve pet'
+inventoryFullOnPetSwap: '&cInventory full. Cannot swap selected pet'
+invalidPetSelect: '&cUnable to select this pet (id={id}). Please alert a staff member!'
+petInvalidAfterReload: '&cYour pet became invalid after a plugin reload! (id={id})'

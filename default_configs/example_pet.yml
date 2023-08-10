@@ -10,32 +10,47 @@ item:
     - '&eExperience: {xp}'
     - '&7{percent}% of the way to the next level'
     - ''
-    - '&7- &7{boost_1}% more Common Shards'
+    - '&7- {boost_1}% more Common Shards'
     - '&7- &bReward Boost: {boost_2}%'
     - '&7- &dPyrotechnic Boost: {boost_3}%'
+    - '&7- {boost_4}x damage to Skeletons and Zombies'
     - '&7- &fPermanent Speed 1'
-    - '&7- &aXP Boost: {boost_5}%'
+    - '&7- &aXP Boost: {boost_6}%'
+menu_item:
+  name: '&3Example Pet'
+  lore:
+    - '&7Use this lore to explain your'
+    - '&7pet or how it is obtained'
+    - ''
+    - '&aMax Level: {max_level}'
+    - ''
+    - '&7- {boost_1_0}% -> {boost_1_100}% more Common Shards'
+    - '&7- &bReward Boost: {boost_2_0}% -> {boost_2_100}%'
+    - '&7- &dPyrotechnic Boost: {{boost_3_0}x -> {boost_3_100}x'
+    - '&7- {boost_4_0}x -> {boost_4_100}x damage to Skeletons and Zombies'
+    - '&7- &fPermanent Speed 1'
+    - '&7- &aXP Boost: {boost_6_0}% -> {boost_6_100}%'
 boosts:
   '1':
+    type: DOUBLE_REWARD
+    rewardID: common_shard
+    percent: 0.04*x + 3
+  '2':
+    type: GENERAL_REWARD
+    multiplier: 0.0002*x + 1.01
+    isMultiplicative: true
+  '3':
+    type: ENCHANT
+    enchant: PYROTECHNIC
+    multiplier: 0.0004*x + 1.03
+    isMultiplicative: true
+  '4':
     type: DAMAGE
     multiplier: 1.1
     allowAll: false
     whitelist:
       - SKELETON
       - ZOMBIE
-  '2':
-    type: DOUBLE_REWARD
-    rewardID: common_shard
-    percent: 0.04*x + 3
-  '3':
-    type: GENERAL_REWARD
-    multiplier: 0.0002*x + 1.01
-    isMultiplicative: true
-  '4':
-    type: ENCHANT
-    enchant: PYROTECHNIC
-    multiplier: 0.0004*x + 1.03
-    isMultiplicative: true
   '5':
     type: POTION_EFFECT
     effect: SPEED

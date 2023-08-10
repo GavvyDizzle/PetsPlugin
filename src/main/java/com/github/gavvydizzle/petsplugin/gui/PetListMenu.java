@@ -1,146 +1,103 @@
 package com.github.gavvydizzle.petsplugin.gui;
 
+import com.github.gavvydizzle.petsplugin.PetsPlugin;
+import com.github.gavvydizzle.petsplugin.gui.item.InventoryItem;
+import com.github.gavvydizzle.petsplugin.gui.item.ItemType;
 import com.github.gavvydizzle.petsplugin.pets.Pet;
 import com.github.gavvydizzle.petsplugin.pets.PetManager;
 import com.github.gavvydizzle.petsplugin.utils.Sounds;
-import com.github.mittenmc.serverutils.ColoredItems;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.*;
 
-/**
- * Admin only menu that lists all loaded pets
- */
 public class PetListMenu implements ClickableMenu {
 
-    private static final int inventorySize;
-    private static final int pageDownSlot;
-    private static final int pageInfoSlot;
-    private static final int pageUpSlot;
-    private static final ItemStack pageInfoItem;
-    private static final ItemStack previousPageItem;
-    private static final ItemStack nextPageItem;
-    private static final ItemStack pageRowFiller;
-
-    static {
-        inventorySize = 54;
-        pageDownSlot = 48;
-        pageInfoSlot = 49;
-        pageUpSlot = 50;
-
-        pageInfoItem = new ItemStack(Material.PAPER);
-
-        previousPageItem = new ItemStack(Material.PAPER);
-        ItemMeta prevPageMeta = previousPageItem.getItemMeta();
-        assert prevPageMeta != null;
-        prevPageMeta.setDisplayName(ChatColor.YELLOW + "Previous Page");
-        previousPageItem.setItemMeta(prevPageMeta);
-
-        nextPageItem = new ItemStack(Material.PAPER);
-        ItemMeta nextPageMeta = nextPageItem.getItemMeta();
-        assert nextPageMeta != null;
-        nextPageMeta.setDisplayName(ChatColor.YELLOW + "Next Page");
-        nextPageItem.setItemMeta(nextPageMeta);
-
-        pageRowFiller = ColoredItems.WHITE.getGlass();
-    }
-
+    private final String menuID;
     private final InventoryManager inventoryManager;
     private final PetManager petManager;
-    private final String inventoryName;
-    private final ArrayList<Pet> pets;
-    private final ArrayList<ItemStack> petItems;
-    private final HashMap<UUID, Integer> playerPages;
+    private final Inventory inventory;
+    private final Map<Integer, InventoryItem> inventoryItemMap;
 
-    public PetListMenu(InventoryManager inventoryManager, PetManager petManager) {
+    public PetListMenu(String menuID, Inventory inventory, InventoryManager inventoryManager, PetManager petManager) {
+        this.menuID = menuID;
+        this.inventory = inventory;
+
         this.inventoryManager = inventoryManager;
         this.petManager = petManager;
 
-        inventoryName = "Pets List";
-        pets = new ArrayList<>();
-        petItems = new ArrayList<>();
-        playerPages = new HashMap<>();
-        reloadContents();
+        inventoryItemMap = new HashMap<>();
+    }
+
+    public void addInventoryItem(int slot, InventoryItem inventoryItem) {
+        if (inventoryItem.getItemType() == ItemType.PET) {
+
+            assert inventoryItem.getExtra() != null;
+            Pet pet = petManager.getPet(inventoryItem.getExtra());
+            if (pet != null) {
+                inventoryItemMap.put(slot, inventoryItem);
+                inventory.setItem(slot, pet.getPetListItemStack());
+            }
+        }
+        else {
+            inventoryItemMap.put(slot, inventoryItem);
+            inventory.setItem(slot, inventoryItem.getItemStack());
+        }
     }
 
     /**
-     * Reloads the contents of this menu.
-     * This method should be called after all pets have been reloaded.
+     * Reloads all pet items displayed in this menu.
+     * This is to be called after pets have reloaded.
      */
-    public void reloadContents() {
-        pets.clear();
-        pets.addAll(petManager.getLoadedPets());
-        Collections.sort(pets);
+    public void updatePetItems() {
+        for (Map.Entry<Integer, InventoryItem> entry : inventoryItemMap.entrySet()) {
+            if (entry.getValue().getItemType() == ItemType.PET) {
+                assert entry.getValue().getExtra() != null;
 
-        petItems.clear();
-        for (Pet pet : pets) {
-            petItems.add(pet.getPetListItemStack());
+                Pet pet = petManager.getPet(entry.getValue().getExtra());
+                if (pet == null) {
+                    PetsPlugin.getInstance().getLogger().warning("Invalid petID '" + entry.getValue().getExtra() + "' in submenu menuID=" + menuID + " in menus.yml. The pet was deleted or did not load properly");
+                    continue;
+                }
+
+                inventory.setItem(entry.getKey(), pet.getPetListItemStack());
+            }
         }
     }
 
     @Override
     public void openInventory(Player player) {
-        Inventory inventory = Bukkit.createInventory(player, inventorySize, inventoryName);
-
-        for (int slot = 0; slot < getNumItemsOnPage(1); slot++) {
-            inventory.setItem(slot, petItems.get(getIndexByPage(1, slot)));
-        }
-        for (int i = 45; i < 54; i++) {
-            inventory.setItem(i, pageRowFiller);
-        }
-        inventory.setItem(pageDownSlot, previousPageItem);
-        inventory.setItem(pageInfoSlot, getPageItem(1));
-        inventory.setItem(pageUpSlot, nextPageItem);
-
-        inventoryManager.onMenuOpen(player, this);
-        playerPages.put(player.getUniqueId(), 1);
         player.openInventory(inventory);
+        inventoryManager.onMenuOpen(player, this);
     }
 
     @Override
     public void closeInventory(Player player) {
-        playerPages.remove(player.getUniqueId());
+
     }
 
     @Override
     public void handleClick(InventoryClickEvent e) {
         if (e.getClickedInventory() != e.getView().getTopInventory()) return;
 
-        if (e.getSlot() == pageUpSlot) {
-            if (playerPages.get(e.getWhoClicked().getUniqueId()) < getMaxPage()) {
-                playerPages.put(e.getWhoClicked().getUniqueId(), playerPages.get(e.getWhoClicked().getUniqueId()) + 1);
-                updatePage((Player) e.getWhoClicked());
-                Sounds.pageTurnSound.playSound((Player) e.getWhoClicked());
-            }
-            else {
-                Sounds.generalFailSound.playSound((Player) e.getWhoClicked());
-            }
-        }
-        else if (e.getSlot() == pageDownSlot) {
-            if (playerPages.get(e.getWhoClicked().getUniqueId()) > 1) {
-                playerPages.put(e.getWhoClicked().getUniqueId(), playerPages.get(e.getWhoClicked().getUniqueId()) - 1);
-                updatePage((Player) e.getWhoClicked());
-                Sounds.pageTurnSound.playSound((Player) e.getWhoClicked());
-            }
-            else {
-                Sounds.generalFailSound.playSound((Player) e.getWhoClicked());
-            }
-        }
-        else {
-            Pet pet;
-            try {
-                pet = pets.get(getIndexByPage(playerPages.get(e.getWhoClicked().getUniqueId()), e.getSlot()));
-            } catch (Exception ignored) {
-                return;
-            }
+        InventoryItem inventoryItem = inventoryItemMap.get(e.getSlot());
+        if (inventoryItem == null) return;
 
+        if (inventoryItem.getItemType() == ItemType.LINK) {
+            assert inventoryItem.getExtra() != null;
+            if (!inventoryItem.getExtra().equalsIgnoreCase(menuID)) {
+                Bukkit.getScheduler().scheduleSyncDelayedTask(PetsPlugin.getInstance(), () -> inventoryManager.openMenu((Player) e.getWhoClicked(), inventoryManager.getSubmenu(inventoryItem.getExtra())));
+            }
+        }
+        else if (inventoryItem.getItemType() == ItemType.BACK) {
+            Bukkit.getScheduler().scheduleSyncDelayedTask(PetsPlugin.getInstance(), () -> inventoryManager.openMenu((Player) e.getWhoClicked(), inventoryManager.getPetListMainMenu()));
+        }
+        else if (inventoryItem.getItemType() == ItemType.PET && e.getWhoClicked().hasPermission("petsplugin.petsadmin")) {
+            assert inventoryItem.getExtra() != null;
+            Pet pet = petManager.getPet(inventoryItem.getExtra());
             if (pet == null) return;
 
             e.getWhoClicked().getInventory().addItem(pet.getItemStack((Player) e.getWhoClicked(), 0));
@@ -149,39 +106,7 @@ public class PetListMenu implements ClickableMenu {
         }
     }
 
-    private void updatePage(Player player) {
-        Inventory inventory = player.getOpenInventory().getTopInventory();
-        int page = playerPages.get(player.getUniqueId());
-
-        for (int i = 0; i < 45; i++) {
-            inventory.clear(i);
-        }
-
-        for (int i = 0; i < getNumItemsOnPage(page); i++) {
-            inventory.setItem(i, petItems.get(getIndexByPage(page, i)));
-        }
-
-        inventory.setItem(pageInfoSlot, getPageItem(page));
-    }
-
-    private ItemStack getPageItem(int page) {
-        ItemStack pageInfo = pageInfoItem.clone();
-        ItemMeta meta = pageInfo.getItemMeta();
-        assert meta != null;
-        meta.setDisplayName(ChatColor.YELLOW + "Page " + page + "/" + getMaxPage());
-        pageInfo.setItemMeta(meta);
-        return pageInfo;
-    }
-
-    private int getMaxPage() {
-        return (petItems.size() - 1) / 45 + 1;
-    }
-
-    private int getNumItemsOnPage(int page) {
-        return Math.min(45, petItems.size() - (page - 1) * 45);
-    }
-
-    private int getIndexByPage(int page, int slot) {
-        return (page - 1) * 45 + slot;
+    public boolean isItemListEmpty() {
+        return inventoryItemMap.isEmpty();
     }
 }

@@ -1,0 +1,60 @@
+selection_menu:
+  name: Pet Select
+  rows: 4
+  filler: blue
+  petSlot: 13
+  help:
+    slot: 31
+    material: ALLAY_SPAWN_EGG
+    name: '&bPet Selection Help'
+    lore:
+    - '&7When in this menu:'
+    - '&aClick on a pet in your inventory to select it'
+    - '&eClick on the pet in this menu to deselect it'
+    - ''
+    - '&7While holding a pet in your hand and crouching:'
+    - '&aRight-click your pet to select or swap it'
+    - ''
+    - '&7&oNote: Stacked pets will be deleted if equipped!'
+pet_list_main_menu:
+  name: Pet List
+  rows: 3
+  filler: gray
+  items:
+    '1':
+      slot: 12
+      type: PET
+      petID: example_pet
+    '2':
+      slot: 13
+      type: LINK
+      menuID: menu1
+      name: 'Link Item'
+      material: PAPER
+      lore:
+        - 'I can be used to open a submenu'
+    '3':
+      slot: 14
+      type: ITEM
+      name: 'Example Item'
+      material: STONE
+      lore:
+        - 'I can be used for extra info'
+pet_list_submenus:
+  '1':
+    id: menu1
+    name: Pet Submenu 1
+    rows: 3
+    filler: gray
+    items:
+      '1':
+        slot: 12
+        type: PET
+        id: example_pet
+      '2':
+        slot: 18
+        type: BACK
+        name: 'Back Item'
+        material: RED_STAINED_GLASS_PANE
+        lore:
+          - 'I go back to the main menu'

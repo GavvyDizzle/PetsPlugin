@@ -16,18 +16,23 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Pet implements Comparable<Pet> {
+
+    private final Pattern pattern = Pattern.compile("\\{boost_[A-Za-z0-9]+\\}");
+    private final Pattern patternWithLevel = Pattern.compile("\\{boost_[A-Za-z0-9]+_[0-9]+\\}");
 
     private final String id;
     private final int startLevel, maxLevel;
     private final long[] xpPerLevel, totalXpNeeded;
     private final HashMap<BoostType, ArrayList<Boost>> boostsMap;
     private final HashMap<String, Boost> boostsByID;
-    private final ItemStack itemStack;
+    private final ItemStack itemStack, listItemStack;
     private final RewardManager rewardManager;
 
-    public Pet(String id, int startLevel, int maxLevel, List<Long> totalXp, ItemStack itemStack, @Nullable RewardManager rewardManager) {
+    public Pet(String id, int startLevel, int maxLevel, List<Long> totalXp, ItemStack itemStack, ItemStack listItemStack, @Nullable RewardManager rewardManager) {
         this.id = id.toLowerCase();
         this.startLevel = startLevel;
         this.maxLevel = maxLevel;
@@ -47,6 +52,7 @@ public class Pet implements Comparable<Pet> {
         this.boostsMap = new HashMap<>();
         boostsByID = new HashMap<>();
         this.itemStack = itemStack;
+        this.listItemStack = listItemStack;
         initItemStack();
 
         this.rewardManager = rewardManager;
@@ -193,13 +199,16 @@ public class Pet implements Comparable<Pet> {
                         .replace("{xp_remaining}", remainingXpNeeded)
                         .replace("{percent}", percentToNextLevel);
 
-                // Handle boost placeholders
-                // Somewhat inefficient but there usually won't be many boosts per pet, so it shouldn't matter too much
-                if (str.contains("{boost_")) {
-                    for (String key : boostsByID.keySet()) {
-                        Boost boost = boostsByID.get(key);
-                        str = str.replace("{boost_" + key + "}", boost.getPlaceholderAmount(lvl));
-                    }
+                // Support placeholders of the form {boost_id}
+                Matcher matcher = pattern.matcher(str);
+
+                while (matcher.find()) {
+                    String code = matcher.group();
+
+                    Boost boost = boostsByID.get(code.substring(code.indexOf('_') + 1, code.length() - 1));
+                    if (boost == null) continue;
+
+                    str = str.replace(code, boost.getPlaceholderAmount(lvl));
                 }
 
                 lore.add(str);
@@ -217,6 +226,50 @@ public class Pet implements Comparable<Pet> {
      * @return An ItemStack with extra info
      */
     public ItemStack getPetListItemStack() {
+        ItemStack item = listItemStack.clone();
+
+        ItemMeta meta = item.getItemMeta();
+        assert meta != null;
+
+        String maxLevelString = String.valueOf(maxLevel);
+
+        // Handle boost placeholders (these are custom to the pet list menu item)
+        if (meta.hasLore() && meta.getLore() != null) {
+            ArrayList<String> lore = new ArrayList<>(meta.getLore().size());
+            for (String str : meta.getLore()) {
+                str = str.replace("{max_level}", maxLevelString);
+
+                // Support placeholders of the form {boost_id_level}
+                Matcher matcher = patternWithLevel.matcher(str);
+
+                while (matcher.find()) {
+                    String code = matcher.group();
+
+                    // This will give an array of size 2 [id, level]
+                    String[] arr = code.substring(code.indexOf('_') + 1, code.length() - 1).split("_");
+                    if (arr.length != 2) continue;
+
+                    Boost boost = boostsByID.get(arr[0]);
+                    if (boost == null) continue;
+
+                    str = str.replace(code, boost.getPlaceholderAmount(Numbers.constrain(Integer.parseInt(arr[1]), startLevel, maxLevel)));
+                }
+
+                lore.add(str);
+            }
+            meta.setLore(lore);
+        }
+
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    /**
+     * Creates an item representing this pet for the admin list of pets menu.
+     * This item should not be given to any player!
+     * @return An ItemStack with extra info
+     */
+    public ItemStack getAdminPetListItemStack() {
         ItemStack item = itemStack.clone();
         ItemMeta meta = item.getItemMeta();
         assert meta != null;
@@ -229,6 +282,8 @@ public class Pet implements Comparable<Pet> {
         item.setItemMeta(meta);
         return item;
     }
+
+
 
     public RewardManager getRewardManager() {
         return rewardManager;

@@ -1,7 +1,7 @@
 package com.github.gavvydizzle.petsplugin.storage;
 
 import com.github.gavvydizzle.petsplugin.pets.SelectedPet;
-import com.github.gavvydizzle.petsplugin.utils.Pair;
+import com.github.mittenmc.serverutils.Pair;
 import com.github.mittenmc.serverutils.UUIDConverter;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;

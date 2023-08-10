@@ -3,6 +3,7 @@ package com.github.gavvydizzle.petsplugin.commands.admin;
 import com.github.gavvydizzle.petsplugin.commands.AdminCommandManager;
 import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
 import com.github.mittenmc.serverutils.Numbers;
+import com.github.mittenmc.serverutils.PlayerNameCache;
 import com.github.mittenmc.serverutils.SubCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -42,7 +43,7 @@ public class PetInfoCommand extends SubCommand {
             return;
         }
 
-        String ownerName = Bukkit.getOfflinePlayer(Objects.requireNonNull(PDCUtils.getOwnerUUID(item))).getName();
+        String ownerName = PlayerNameCache.get(PDCUtils.getOwnerUUID(item));
         long xp = PDCUtils.getXP(item);
 
         player.sendMessage(ChatColor.GREEN + "Pet Info:");

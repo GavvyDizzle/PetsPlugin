@@ -7,10 +7,10 @@ import com.github.gavvydizzle.petsplugin.pets.reward.*;
 import com.github.gavvydizzle.petsplugin.storage.PlayerData;
 import com.github.gavvydizzle.petsplugin.utils.Messages;
 import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
-import com.github.gavvydizzle.petsplugin.utils.Pair;
 import com.github.gavvydizzle.petsplugin.utils.Sounds;
 import com.github.gavvydizzle.prisonmines.api.PrisonMinesAPI;
 import com.github.mittenmc.serverutils.Colors;
+import com.github.mittenmc.serverutils.Pair;
 import com.github.mittenmc.serverutils.RepeatingTask;
 import me.gavvydizzle.minerewards.events.RewardFindEvent;
 import me.gavvydizzle.minerewards.events.RewardSearchEvent;
@@ -36,6 +36,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.potion.PotionEffectType;
 
@@ -78,7 +79,7 @@ public class PetManager implements Listener {
         new RepeatingTask(instance, AUTO_SAVE_SECONDS * 20, AUTO_SAVE_SECONDS * 20) {
             @Override
             public void run() {
-                if (selectedPets.size() > 0)
+                if (!selectedPets.isEmpty())
                     Bukkit.getScheduler().runTaskAsynchronously(instance, () -> {
                         if (!data.savePlayerInfo(selectedPets)) {
                             instance.getLogger().severe("Failed to auto-save selected pets");
@@ -236,16 +237,21 @@ public class PetManager implements Listener {
             instance.getLogger().severe("No skull link given in " + file.getName());
             return;
         }
-
         SkullMeta meta = SkullUtils.applySkin(itemStack.getItemMeta(), skillLink);
         meta.setDisplayName(Colors.conv(config.getString("item.name")));
         meta.setLore(Colors.conv(config.getStringList("item.lore")));
-
         itemStack.setItemMeta(meta);
+
+        ItemStack listItem = itemStack.clone();
+        ItemMeta meta2 = listItem.getItemMeta();
+        assert meta2 != null;
+        meta2.setDisplayName(Colors.conv(config.getString("menu_item.name")));
+        meta2.setLore(Colors.conv(config.getStringList("menu_item.lore")));
+        listItem.setItemMeta(meta2);
 
         RewardManager rewardManager = generateRewardManager(config, file.getName());
 
-        Pet pet = new Pet(id, startLevel, maxLevel, totalXp, itemStack, rewardManager);
+        Pet pet = new Pet(id, startLevel, maxLevel, totalXp, itemStack, listItem, rewardManager);
         petHashMap.put(pet.getId(), pet);
 
         if (config.getConfigurationSection("boosts") != null) {
@@ -291,8 +297,9 @@ public class PetManager implements Listener {
                         continue;
                     }
                     String percentChanceEquation = config.getString(path + ".percent");
+                    String message = Colors.conv(config.getString(path + ".message"));
 
-                    pet.addBoost(new RewardDoublerBoost(key, rewardID, percentChanceEquation));
+                    pet.addBoost(new RewardDoublerBoost(key, rewardID, percentChanceEquation, message));
                 }
                 else if (boostType == BoostType.GENERAL_REWARD) {
                     multiplierEquation = config.getString(path + ".multiplier");
@@ -305,23 +312,28 @@ public class PetManager implements Listener {
                     pet.addBoost(new GeneralRewardBoost(key, multiplierEquation, isMultiplicative));
                 }
                 else if (boostType == BoostType.ENCHANT) {
-                    EnchantIdentifier enchantIdentifier;
-                    try {
-                        enchantIdentifier = EnchantIdentifier.valueOf(config.getString(path + ".enchant"));
-                    } catch (Exception e) {
-                        instance.getLogger().severe("Enchant not found " + file.getName() + " " + path);
-                        continue;
-                    }
-
                     multiplierEquation = config.getString(path + ".multiplier");
                     if (multiplierEquation == null) {
                         instance.getLogger().severe("Multiplier missing " + file.getName() + " " + path);
                         continue;
                     }
-
                     isMultiplicative = config.getBoolean(path + ".isMultiplicative");
 
-                    pet.addBoost(new EnchantBoost(key, enchantIdentifier, multiplierEquation, isMultiplicative));
+                    boolean allowAll = config.getBoolean(path + ".allowAll");
+                    if (allowAll) {
+                        pet.addBoost(new EnchantBoost(key, null, multiplierEquation, isMultiplicative));
+                    }
+                    else {
+                        ArrayList<EnchantIdentifier> enchantIdentifiers = new ArrayList<>();
+                        for (String s : config.getStringList(path + ".whitelist")) {
+                            try {
+                                enchantIdentifiers.add(EnchantIdentifier.valueOf(s));
+                            } catch (Exception e) {
+                                instance.getLogger().warning("Enchant not found '" + s + "' at " + file.getName() + " " + path + ".whitelist");
+                            }
+                        }
+                        pet.addBoost(new EnchantBoost(key, enchantIdentifiers, multiplierEquation, isMultiplicative));
+                    }
                 }
                 else if (boostType == BoostType.POTION_EFFECT) {
                     PotionEffectType potionEffectType;
@@ -433,13 +445,13 @@ public class PetManager implements Listener {
     private void onPlayerJoin(PlayerJoinEvent e) {
         Bukkit.getScheduler().runTaskAsynchronously(instance, () -> {
             Pair<SelectedPet, Integer> pair = data.getSelectedPet(e.getPlayer());
-            if (pair.getB() == 1) {
+            if (pair.second() == 1) {
                 e.getPlayer().sendMessage("&cAn error occurred when loading your pet. You will not be able to change your pet. Please alert a staff member!");
                 selectedPets.put(e.getPlayer().getUniqueId(), new SelectedPet("null", 0));
                 return;
             }
 
-            SelectedPet selectedPet = pair.getA();
+            SelectedPet selectedPet = pair.first();
             if (selectedPet != null) {
                 Bukkit.getScheduler().runTask(instance, () -> onPlayerJoinLoadPet(e.getPlayer(), selectedPet));
             }
@@ -468,6 +480,7 @@ public class PetManager implements Listener {
 
                 if (b.shouldActivate(level)) {
                     e.getReward().executeCommand(e.getPlayer());
+                    b.sendMessage(e.getPlayer());
                 }
 
             }
@@ -504,7 +517,7 @@ public class PetManager implements Listener {
 
         for (Boost boost : pet.getBoostsByType(BoostType.ENCHANT)) {
             EnchantBoost b = (EnchantBoost) boost;
-            if (b.getEnchantIdentifier() == e.getEnchant().getEnchantIdentifier()) {
+            if (b.shouldBoostEnchant(e.getEnchant().getEnchantIdentifier())) {
 
                 if (b.isMultiplicative()) {
                     e.multiplyActivationChance(b.getMultiplier(level));
@@ -542,8 +555,9 @@ public class PetManager implements Listener {
         }
 
         if (oldLevel != newLevel) {
-            if (Messages.petLevelUpMessage.length() > 0) {
+            if (!Messages.petLevelUpMessage.isEmpty()) {
                 e.getPlayer().sendMessage(Messages.petLevelUpMessage.replace("{pet_name}", pet.getPetName(newLevel)));
+                e.getPlayer().sendMessage(Messages.petLevelUpMessage.replace("{lvl}", String.valueOf(newLevel)));
                 Sounds.petLevelUpSound.playSound(e.getPlayer());
             }
         }
@@ -551,8 +565,7 @@ public class PetManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     private void onEntityDamage(EntityDamageByEntityEvent e) {
-        if (!(e.getDamager() instanceof Player)) return;
-        Player player = (Player) e.getDamager();
+        if (!(e.getDamager() instanceof Player player)) return;
 
         Pet pet = getSelectedPet(player);
         if (pet == null) return;

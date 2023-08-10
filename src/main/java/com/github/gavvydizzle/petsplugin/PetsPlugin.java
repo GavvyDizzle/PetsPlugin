@@ -80,7 +80,7 @@ public final class PetsPlugin extends JavaPlugin {
             return;
         }
         try {
-            Objects.requireNonNull(getCommand("pets")).setExecutor(new PlayerCommandManager(inventoryManager));
+            new PlayerCommandManager(Objects.requireNonNull(getCommand("pets")), inventoryManager);
         } catch (NullPointerException e) {
             getLogger().severe("The player command name was changed in the plugin.yml file. Please make it \"pets\" and restart the server. You can change the aliases but NOT the command name.");
             getServer().getPluginManager().disablePlugin(this);

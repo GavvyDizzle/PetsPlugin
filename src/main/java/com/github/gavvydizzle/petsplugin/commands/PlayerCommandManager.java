@@ -1,35 +1,56 @@
 package com.github.gavvydizzle.petsplugin.commands;
 
+import com.github.gavvydizzle.petsplugin.commands.player.OpenMenuCommand;
+import com.github.gavvydizzle.petsplugin.commands.player.PlayerHelpCommand;
+import com.github.gavvydizzle.petsplugin.configs.CommandsConfig;
 import com.github.gavvydizzle.petsplugin.gui.InventoryManager;
-import org.bukkit.command.Command;
+import com.github.mittenmc.serverutils.Colors;
+import com.github.mittenmc.serverutils.CommandManager;
+import com.github.mittenmc.serverutils.SubCommand;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabExecutor;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.List;
-
-public class PlayerCommandManager implements TabExecutor {
+public class PlayerCommandManager extends CommandManager {
 
     private final InventoryManager inventoryManager;
+    private String helpCommandPadding;
 
-    public PlayerCommandManager(InventoryManager inventoryManager) {
+    public PlayerCommandManager(PluginCommand command, InventoryManager inventoryManager) {
+        super(command);
         this.inventoryManager = inventoryManager;
+
+        registerCommand(new OpenMenuCommand(this, inventoryManager));
+        registerCommand(new PlayerHelpCommand(this));
+        sortCommands();
+
+        reload();
+    }
+
+    public void reload() {
+        FileConfiguration config = CommandsConfig.get();
+        config.options().copyDefaults(true);
+        config.addDefault("commandDisplayName.player", getCommandDisplayName());
+        config.addDefault("helpCommandPadding.player", "&6-----(Pets Commands)-----");
+
+        for (SubCommand subCommand : getSubcommands()) {
+            CommandsConfig.setPlayerDescriptionDefault(subCommand);
+        }
+        CommandsConfig.save();
+
+        setCommandDisplayName(config.getString("commandDisplayName.player"));
+        helpCommandPadding = Colors.conv(config.getString("helpCommandPadding.player"));
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] args) {
-        if (!(sender instanceof Player)) return true;
-
-        inventoryManager.getPetMenu().openInventory(((Player) sender).getPlayer());
-        return true;
+    public void onNoSubcommand(CommandSender sender, String[] args) {
+        if (sender instanceof Player player) {
+            inventoryManager.getPetMenu().openInventory(player);
+        }
     }
 
-    @Nullable
-    @Override
-    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] args) {
-        return Collections.emptyList();
+    public String getHelpCommandPadding() {
+        return helpCommandPadding;
     }
 }

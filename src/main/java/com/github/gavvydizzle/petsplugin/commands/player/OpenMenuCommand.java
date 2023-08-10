@@ -1,20 +1,24 @@
-package com.github.gavvydizzle.petsplugin.commands.admin;
+package com.github.gavvydizzle.petsplugin.commands.player;
 
-import com.github.gavvydizzle.petsplugin.commands.AdminCommandManager;
+import com.github.gavvydizzle.petsplugin.PetsPlugin;
+import com.github.gavvydizzle.petsplugin.commands.PlayerCommandManager;
+import com.github.gavvydizzle.petsplugin.configs.CommandsConfig;
 import com.github.gavvydizzle.petsplugin.gui.InventoryManager;
+import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.SubCommand;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.util.Collections;
 import java.util.List;
 
-public class OpenPetListCommand extends SubCommand {
+public class OpenMenuCommand extends SubCommand {
 
     private final InventoryManager inventoryManager;
 
-    public OpenPetListCommand(AdminCommandManager adminCommandManager, InventoryManager inventoryManager) {
+    public OpenMenuCommand(PlayerCommandManager adminCommandManager, InventoryManager inventoryManager) {
         this.inventoryManager = inventoryManager;
 
         setName("list");
@@ -26,8 +30,8 @@ public class OpenPetListCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (sender instanceof Player) {
-            inventoryManager.getPetListAdminMenu().openInventory(((Player) sender).getPlayer());
+        if (sender instanceof Player player) {
+            inventoryManager.getPetListMainMenu().openInventory(player);
         }
     }
 

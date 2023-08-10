@@ -4,8 +4,8 @@ import com.github.mittenmc.serverutils.Numbers;
 import org.bukkit.entity.EntityType;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 public class DamageBoost extends Boost {
 
@@ -13,7 +13,7 @@ public class DamageBoost extends Boost {
     private final HashSet<EntityType> entityTypes;
     private final String multiplierEquation;
 
-    public DamageBoost(String id, @Nullable ArrayList<EntityType> entityTypes, String multiplierEquation) {
+    public DamageBoost(String id, @Nullable List<EntityType> entityTypes, String multiplierEquation) {
         super(BoostType.DAMAGE, id);
         if (entityTypes == null || entityTypes.isEmpty()) {
             this.entityTypes = null;
@@ -39,7 +39,8 @@ public class DamageBoost extends Boost {
      */
     @Override
     public String getPlaceholderAmount(int level) {
-        return String.valueOf(Numbers.round(getMultiplier(level) * 100, DECIMAL_PLACES));
+        // Hard coded to get % from the boost
+        return String.valueOf(Numbers.round(getMultiplier(level) * 100 - 100, DECIMAL_PLACES));
     }
 
     public double getMultiplier(int level) {

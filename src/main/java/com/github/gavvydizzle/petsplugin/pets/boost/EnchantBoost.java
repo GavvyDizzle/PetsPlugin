@@ -2,18 +2,36 @@ package com.github.gavvydizzle.petsplugin.pets.boost;
 
 import com.github.mittenmc.serverutils.Numbers;
 import me.wax.prisonenchants.enchants.EnchantIdentifier;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.HashSet;
+import java.util.List;
 
 public class EnchantBoost extends Boost {
 
-    private final EnchantIdentifier enchantIdentifier;
+    private final HashSet<EnchantIdentifier> enchantIdentifiers;
     private final String multiplierEquation;
     private final boolean isMultiplicative;
 
-    public EnchantBoost(String id, EnchantIdentifier enchantIdentifier, String multiplierEquation, boolean isMultiplicative) {
+    public EnchantBoost(String id, @Nullable List<EnchantIdentifier> enchantIdentifiers, String multiplierEquation, boolean isMultiplicative) {
         super(BoostType.ENCHANT, id);
-        this.enchantIdentifier = enchantIdentifier;
+        if (enchantIdentifiers == null || enchantIdentifiers.isEmpty()) {
+            this.enchantIdentifiers = null;
+        }
+        else {
+            this.enchantIdentifiers = new HashSet<>(enchantIdentifiers);
+        }
         this.multiplierEquation = multiplierEquation;
         this.isMultiplicative = isMultiplicative;
+    }
+
+    /**
+     * Determines if the enchant matches the type for this boost
+     * @param enchantIdentifier The type of enchant that activated
+     * @return If activation chance should be multiplied by this boost
+     */
+    public boolean shouldBoostEnchant(EnchantIdentifier enchantIdentifier) {
+        return enchantIdentifiers == null || enchantIdentifiers.contains(enchantIdentifier);
     }
 
     /**
@@ -22,11 +40,7 @@ public class EnchantBoost extends Boost {
      */
     @Override
     public String getPlaceholderAmount(int level) {
-        return String.valueOf(Numbers.round(getMultiplier(level) * 100, DECIMAL_PLACES));
-    }
-
-    public EnchantIdentifier getEnchantIdentifier() {
-        return enchantIdentifier;
+        return String.valueOf(Numbers.round(getMultiplier(level), DECIMAL_PLACES));
     }
 
     public double getMultiplier(int level) {

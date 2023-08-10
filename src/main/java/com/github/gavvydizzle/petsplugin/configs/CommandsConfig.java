@@ -42,8 +42,20 @@ public class CommandsConfig {
     }
 
 
+    public static void setPlayerDescriptionDefault(SubCommand subCommand) {
+        fileConfiguration.addDefault("descriptions.player." + subCommand.getName(), subCommand.getDescription());
+    }
+
     public static void setAdminDescriptionDefault(SubCommand subCommand) {
         fileConfiguration.addDefault("descriptions.admin." + subCommand.getName(), subCommand.getDescription());
+    }
+
+    /**
+     * @param subCommand The SubCommand
+     * @return The description of this SubCommand as defined in this config file
+     */
+    public static String getPlayerDescription(SubCommand subCommand) {
+        return fileConfiguration.getString("descriptions.player." + subCommand.getName());
     }
 
     /**

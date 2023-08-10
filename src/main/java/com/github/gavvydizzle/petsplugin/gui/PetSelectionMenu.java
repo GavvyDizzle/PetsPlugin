@@ -28,7 +28,7 @@ import java.util.UUID;
 /**
  * Where players choose their selected pet
  */
-public class PetMenu implements ClickableMenu {
+public class PetSelectionMenu implements ClickableMenu {
 
     private String inventoryName;
     private int inventorySize, petSlot;
@@ -39,7 +39,7 @@ public class PetMenu implements ClickableMenu {
     private final PetManager petManager;
     private final ItemStack brokenPetItem;
 
-    public PetMenu(InventoryManager inventoryManager, PetManager petManager) {
+    public PetSelectionMenu(InventoryManager inventoryManager, PetManager petManager) {
         this.inventoryManager = inventoryManager;
         this.petManager = petManager;
 
