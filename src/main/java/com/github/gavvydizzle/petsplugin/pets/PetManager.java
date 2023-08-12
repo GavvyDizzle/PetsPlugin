@@ -556,9 +556,10 @@ public class PetManager implements Listener {
 
         if (oldLevel != newLevel) {
             if (!Messages.petLevelUpMessage.isEmpty()) {
-                e.getPlayer().sendMessage(Messages.petLevelUpMessage.replace("{pet_name}", pet.getPetName(newLevel)));
-                e.getPlayer().sendMessage(Messages.petLevelUpMessage.replace("{lvl}", String.valueOf(newLevel)));
-                Sounds.petLevelUpSound.playSound(e.getPlayer());
+                e.getPlayer().sendMessage(Messages.petLevelUpMessage
+                        .replace("{pet_name}", pet.getPetName(newLevel))
+                        .replace("{lvl}", String.valueOf(newLevel))
+                );
             }
         }
     }
