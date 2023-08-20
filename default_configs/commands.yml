@@ -1,8 +1,13 @@
 commandDisplayName:
+  player: pets
   admin: petsadmin
 helpCommandPadding:
+  player: '&6-----(Pets Commands)-----'
   admin: '&6-----(PetsPlugin Admin Commands)-----'
 descriptions:
+  player:
+    help: Opens this help menu
+    list: Opens the pet list menu
   admin:
     setXP: Update your held pet's XP
     deselect: Force deselect a pet (deletes if one was selected)
