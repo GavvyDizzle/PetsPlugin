@@ -26,8 +26,8 @@ public class OpenPetListCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (sender instanceof Player) {
-            inventoryManager.getPetListAdminMenu().openInventory(((Player) sender).getPlayer());
+        if (sender instanceof Player player) {
+            inventoryManager.openMenu(player, inventoryManager.getPetListAdminMenu());
         }
     }
 

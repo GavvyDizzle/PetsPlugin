@@ -1,0 +1,4 @@
+petLevelUpMessage: '&aYour {pet_name} &ajust levelled up!'
+invalidPetSelect: '&cUnable to select this pet (id={id}). Please alert a staff member!'
+notPetOwnerOnSelect: '&cYou can only select a pet that belongs to you!'
+petInvalidAfterReload: '&cYour pet became invalid after a plugin reload! (id={id})'

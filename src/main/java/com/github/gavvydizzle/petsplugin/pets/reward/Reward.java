@@ -1,7 +1,7 @@
 package com.github.gavvydizzle.petsplugin.pets.reward;
 
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import java.util.List;
 
@@ -25,14 +25,15 @@ public class Reward {
     /**
      * Collects the reward for this player.
      * This will send all messages then run commands after.
-     * @param player The player
+     * @param loadedPlayer The player
      */
-    protected void collect(Player player) {
+    protected void collect(LoadedPlayer loadedPlayer) {
+        // If you want to disable reward messages do it here
         for (String message : messages) {
-            player.sendMessage(message);
+            loadedPlayer.sendMessage(message);
         }
         for (String command : commands) {
-            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), command.replace("{player}", player.getName()));
+            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), command.replace("{player}", loadedPlayer.getName()));
         }
     }
 

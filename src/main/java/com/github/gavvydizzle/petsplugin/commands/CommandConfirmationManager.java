@@ -23,8 +23,7 @@ public class CommandConfirmationManager {
             return;
         }
 
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+        if (!(sender instanceof Player player)) return;
 
         if (commandConfirmations.containsKey(player.getUniqueId())) {
             player.sendMessage(ChatColor.RED + "You already have a pending command");

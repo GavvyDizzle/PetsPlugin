@@ -16,7 +16,7 @@ public enum BoostType {
      * @return The BoostType matching this string or null
      */
     @Nullable
-    public static BoostType getBoostType(@Nullable String str) {
+    public static BoostType get(@Nullable String str) {
         if (str == null) return null;
 
         for (BoostType boostType : BoostType.values()) {

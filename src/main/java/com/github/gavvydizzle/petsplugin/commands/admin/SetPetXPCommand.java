@@ -4,7 +4,6 @@ import com.github.gavvydizzle.petsplugin.commands.AdminCommandManager;
 import com.github.gavvydizzle.petsplugin.pets.Pet;
 import com.github.gavvydizzle.petsplugin.pets.PetManager;
 import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
-import com.github.mittenmc.serverutils.Numbers;
 import com.github.mittenmc.serverutils.SubCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -33,8 +32,7 @@ public class SetPetXPCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+        if (!(sender instanceof Player player)) return;
 
         if (args.length < 2) {
             sender.sendMessage(getColoredSyntax());
@@ -59,9 +57,9 @@ public class SetPetXPCommand extends SubCommand {
             return;
         }
 
-        long xp;
+        double xp;
         try {
-            xp = Long.parseLong(args[1]);
+            xp = Double.parseDouble(args[1]);
         } catch (Exception e) {
             sender.sendMessage(ChatColor.RED + "Invalid xp amount: " + args[1]);
             return;
@@ -75,7 +73,7 @@ public class SetPetXPCommand extends SubCommand {
         newPet.setAmount(item.getAmount());
 
         sender.sendMessage(ChatColor.GREEN + "Updated pet xp to " + xp + " (was " + PDCUtils.getXP(item) + ")");
-        ((Player) sender).getInventory().setItemInMainHand(newPet);
+        player.getInventory().setItemInMainHand(newPet);
     }
 
     @Override

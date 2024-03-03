@@ -1,7 +1,6 @@
 package com.github.gavvydizzle.petsplugin.commands.admin;
 
 import com.github.gavvydizzle.petsplugin.commands.AdminCommandManager;
-import com.github.gavvydizzle.petsplugin.configs.CommandsConfig;
 import com.github.mittenmc.serverutils.SubCommand;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -31,7 +30,7 @@ public class AdminHelpCommand extends SubCommand {
         if (!padding.isEmpty()) sender.sendMessage(padding);
         ArrayList<SubCommand> subCommands = adminCommandManager.getSubcommands();
         for (SubCommand subCommand : subCommands) {
-            sender.sendMessage(ChatColor.GOLD + subCommand.getSyntax() + " - " + ChatColor.YELLOW + CommandsConfig.getAdminDescription(subCommand));
+            sender.sendMessage(ChatColor.GOLD + subCommand.getSyntax() + " - " + ChatColor.YELLOW + adminCommandManager.getAdminDescription(subCommand));
         }
         if (!padding.isEmpty()) sender.sendMessage(padding);
     }

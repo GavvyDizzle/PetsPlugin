@@ -1,0 +1,7 @@
+useGlobalForAllPets: false
+KILLING:
+  SKELETON: 15
+  ZOMBIE: 10
+MINING:
+  STONE: 1
+  IRON_ORE: 5

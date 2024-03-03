@@ -1,9 +1,9 @@
 package com.github.gavvydizzle.petsplugin.pets.reward;
 
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
 import com.github.mittenmc.serverutils.Colors;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -26,14 +26,14 @@ public class KillRewards extends RewardsSet {
 
     /**
      * Attempts to give a reward to the player.
-     * @param player The player
+     * @param loadedPlayer The player
      * @param entityType The type of entity that was killed
      */
-    public void giveReward(Player player, EntityType entityType) {
+    public void giveReward(LoadedPlayer loadedPlayer, EntityType entityType) {
         if (shouldNotGiveReward()) return;
         if (entityTypes != null && !entityTypes.contains(entityType)) return;
 
-        giveReward(player);
+        giveReward(loadedPlayer);
     }
 
     @Override

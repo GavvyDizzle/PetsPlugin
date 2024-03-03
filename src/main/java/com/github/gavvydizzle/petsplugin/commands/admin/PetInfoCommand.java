@@ -5,7 +5,6 @@ import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
 import com.github.mittenmc.serverutils.Numbers;
 import com.github.mittenmc.serverutils.PlayerNameCache;
 import com.github.mittenmc.serverutils.SubCommand;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
@@ -14,7 +13,6 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 public class PetInfoCommand extends SubCommand {
 
@@ -28,8 +26,7 @@ public class PetInfoCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+        if (!(sender instanceof Player player)) return;
 
         ItemStack item = player.getInventory().getItemInMainHand();
         if (item.getType() == Material.AIR) {
@@ -44,7 +41,7 @@ public class PetInfoCommand extends SubCommand {
         }
 
         String ownerName = PlayerNameCache.get(PDCUtils.getOwnerUUID(item));
-        long xp = PDCUtils.getXP(item);
+        double xp = PDCUtils.getXP(item);
 
         player.sendMessage(ChatColor.GREEN + "Pet Info:");
         player.sendMessage(ChatColor.YELLOW + " id=" + petID);

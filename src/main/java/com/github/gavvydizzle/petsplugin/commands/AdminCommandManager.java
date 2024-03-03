@@ -2,9 +2,9 @@ package com.github.gavvydizzle.petsplugin.commands;
 
 import com.github.gavvydizzle.petsplugin.PetsPlugin;
 import com.github.gavvydizzle.petsplugin.commands.admin.*;
-import com.github.gavvydizzle.petsplugin.configs.CommandsConfig;
 import com.github.gavvydizzle.petsplugin.gui.InventoryManager;
 import com.github.gavvydizzle.petsplugin.pets.PetManager;
+import com.github.gavvydizzle.petsplugin.player.PlayerManager;
 import com.github.gavvydizzle.petsplugin.storage.PlayerData;
 import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.CommandManager;
@@ -20,7 +20,7 @@ public class AdminCommandManager extends CommandManager {
     private final CommandConfirmationManager confirmationManager;
     private String helpCommandPadding;
 
-    public AdminCommandManager(PluginCommand command, CommandConfirmationManager confirmationManager, PetManager petManager, InventoryManager inventoryManager, PlayerData data) {
+    public AdminCommandManager(PluginCommand command, CommandConfirmationManager confirmationManager, PlayerManager playerManager, PetManager petManager, InventoryManager inventoryManager, PlayerData data) {
         super(command);
         this.confirmationManager = confirmationManager;
 
@@ -29,9 +29,9 @@ public class AdminCommandManager extends CommandManager {
         }
         registerCommand(new AdminConfirmCommand(this));
         registerCommand(new AdminHelpCommand(this));
-        registerCommand(new DeselectPetCommand(this, petManager));
         registerCommand(new GiveToPlayerCommand(this, petManager));
         registerCommand(new OpenPetListCommand(this, inventoryManager));
+        registerCommand(new OpenPlayerMenu(this, playerManager, inventoryManager, data));
         registerCommand(new PetInfoCommand(this));
         registerCommand(new PetRewardInfoCommand(this, petManager));
         registerCommand(new ReloadCommand(this));
@@ -43,15 +43,15 @@ public class AdminCommandManager extends CommandManager {
     }
 
     public void reload() {
-        FileConfiguration config = CommandsConfig.get();
-        config.options().copyDefaults(true);
+        FileConfiguration config = PetsPlugin.getConfigManager().get("commands");
+        if (config == null) return;
+
         config.addDefault("commandDisplayName.admin", getCommandDisplayName());
         config.addDefault("helpCommandPadding.admin", "&6-----(" + PetsPlugin.getInstance().getName() + " Admin Commands)-----");
 
         for (SubCommand subCommand : getSubcommands()) {
-            CommandsConfig.setAdminDescriptionDefault(subCommand);
+            setAdminDescriptionDefault(config, subCommand);
         }
-        CommandsConfig.save();
 
         setCommandDisplayName(config.getString("commandDisplayName.admin"));
         helpCommandPadding = Colors.conv(config.getString("helpCommandPadding.admin"));
@@ -86,5 +86,21 @@ public class AdminCommandManager extends CommandManager {
 
     public String getHelpCommandPadding() {
         return helpCommandPadding;
+    }
+
+
+    public void setAdminDescriptionDefault(FileConfiguration fileConfiguration, SubCommand subCommand) {
+        fileConfiguration.addDefault("descriptions.admin." + subCommand.getName(), subCommand.getDescription());
+    }
+
+    /**
+     * @param subCommand The SubCommand
+     * @return The description of this SubCommand as defined in this config file
+     */
+    public String getAdminDescription(SubCommand subCommand) {
+        FileConfiguration config = PetsPlugin.getConfigManager().get("commands");
+        if (config == null) return "";
+
+        return config.getString("descriptions.admin." + subCommand.getName());
     }
 }

@@ -1,14 +1,10 @@
 package com.github.gavvydizzle.petsplugin.commands.player;
 
-import com.github.gavvydizzle.petsplugin.PetsPlugin;
 import com.github.gavvydizzle.petsplugin.commands.PlayerCommandManager;
-import com.github.gavvydizzle.petsplugin.configs.CommandsConfig;
 import com.github.gavvydizzle.petsplugin.gui.InventoryManager;
-import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.SubCommand;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.util.Collections;

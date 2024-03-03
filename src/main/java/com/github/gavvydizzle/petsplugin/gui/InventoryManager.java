@@ -1,15 +1,18 @@
 package com.github.gavvydizzle.petsplugin.gui;
 
 import com.github.gavvydizzle.petsplugin.PetsPlugin;
-import com.github.gavvydizzle.petsplugin.configs.MenusConfig;
 import com.github.gavvydizzle.petsplugin.gui.item.InventoryItem;
 import com.github.gavvydizzle.petsplugin.gui.item.ItemType;
+import com.github.gavvydizzle.petsplugin.gui.view.AdminViewer;
 import com.github.gavvydizzle.petsplugin.pets.Pet;
 import com.github.gavvydizzle.petsplugin.pets.PetManager;
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
+import com.github.gavvydizzle.petsplugin.player.PlayerManager;
 import com.github.mittenmc.serverutils.ColoredItems;
 import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.ConfigUtils;
 import com.github.mittenmc.serverutils.Numbers;
+import com.github.mittenmc.serverutils.gui.ClickableMenu;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
@@ -19,6 +22,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -30,26 +34,31 @@ import java.util.UUID;
 
 public class InventoryManager implements Listener {
 
+    private final PlayerManager playerManager;
     private final PetManager petManager;
     private final PetSelectionMenu petMenu;
     private final PetListAdminMenu petListAdminMenu;
     private final PetListMainMenu petListMainMenu;
     private final Map<String, PetListMenu> submenuMap;
     private final HashMap<UUID, ClickableMenu> playersInInventory;
+    private final Map<UUID, AdminViewer> adminsInInventory;
 
-    public InventoryManager(PetManager petManager) {
+    public InventoryManager(PlayerManager playerManager, PetManager petManager) {
+        this.playerManager = playerManager;
         this.petManager = petManager;
-        playersInInventory = new HashMap<>();
 
-        petMenu = new PetSelectionMenu(this, petManager);
-        petListAdminMenu = new PetListAdminMenu(this, petManager);
+        playersInInventory = new HashMap<>();
+        adminsInInventory = new HashMap<>();
+
+        petMenu = new PetSelectionMenu(this, playerManager, petManager);
+        petListAdminMenu = new PetListAdminMenu(petManager);
         petListMainMenu = new PetListMainMenu(this, petManager);
         submenuMap = new HashMap<>();
         loadSubmenus();
     }
 
     public void reload() {
-        petMenu.reload();
+        petMenu.reload(false);
         petListMainMenu.reload();
         loadSubmenus();
     }
@@ -68,7 +77,8 @@ public class InventoryManager implements Listener {
     private void loadSubmenus() {
         submenuMap.clear();
 
-        FileConfiguration config = MenusConfig.get();
+        FileConfiguration config = PetsPlugin.getConfigManager().get("menus");
+        if (config == null) return;
 
         ConfigurationSection configurationSection = config.getConfigurationSection("pet_list_submenus");
         if (configurationSection == null) return;
@@ -105,7 +115,7 @@ public class InventoryManager implements Listener {
             for (String key2 : itemsConfigurationSection.getKeys(false)) {
                 String path2 = path + ".items." + key2;
 
-                ItemType type = ItemType.getType(config.getString(path2 + ".type"));
+                ItemType type = ItemType.get(config.getString(path2 + ".type"));
                 if (type == null) {
                     PetsPlugin.getInstance().getLogger().warning("Invalid item type for " + path2 + " in menus.yml");
                     continue;
@@ -191,6 +201,15 @@ public class InventoryManager implements Listener {
     }
 
     /**
+     * Saves the menu the admin opened so clicks can be passed to it correctly
+     * @param admin The admin
+     * @param clickableMenu The menu they opened
+     */
+    public void onAdminMenuOpen(Player admin, LoadedPlayer loadedPlayer, ClickableMenu clickableMenu) {
+        adminsInInventory.put(admin.getUniqueId(), new AdminViewer(admin.getUniqueId(), loadedPlayer, clickableMenu));
+    }
+
+    /**
      * Opens the given menu and adds the player to the list of players with opened menus
      * @param player The player
      * @param clickableMenu The menu to open. If null, nothing will happen
@@ -198,15 +217,25 @@ public class InventoryManager implements Listener {
     public void openMenu(Player player, @Nullable ClickableMenu clickableMenu) {
         if (clickableMenu == null) return;
 
-        onMenuOpen(player, clickableMenu);
         clickableMenu.openInventory(player);
+        playersInInventory.put(player.getUniqueId(), clickableMenu);
     }
 
     @EventHandler
     private void onInventoryClose(InventoryCloseEvent e) {
-        ClickableMenu clickableMenu = playersInInventory.remove(e.getPlayer().getUniqueId());
+        Player player = (Player) e.getPlayer();
+
+        ClickableMenu clickableMenu = playersInInventory.remove(player.getUniqueId());
         if (clickableMenu != null) {
-            clickableMenu.closeInventory((Player) e.getPlayer());
+            clickableMenu.closeInventory(player);
+            return;
+        }
+
+        AdminViewer adminViewer = adminsInInventory.remove(player.getUniqueId());
+        if (adminViewer != null) {
+            PetSelectionMenu menu = (PetSelectionMenu) adminViewer.clickableMenu();
+            menu.adminCloseInventory(player, adminViewer.loadedPlayer());
+            playerManager.schedulePlayerUnloadAttempt(adminViewer.loadedPlayer());
         }
     }
 
@@ -214,10 +243,63 @@ public class InventoryManager implements Listener {
     private void onInventoryClick(InventoryClickEvent e) {
         if (e.getClickedInventory() == null) return;
 
-        if (playersInInventory.containsKey(e.getWhoClicked().getUniqueId())) {
+        UUID uuid = e.getWhoClicked().getUniqueId();
+
+        if (playersInInventory.containsKey(uuid)) {
             e.setCancelled(true);
             // Pass along the click event without verifying the inventory the click was done in
-            playersInInventory.get(e.getWhoClicked().getUniqueId()).handleClick(e);
+            playersInInventory.get(uuid).handleClick(e);
+        }
+        else if (adminsInInventory.containsKey(uuid)) {
+            AdminViewer adminViewer = adminsInInventory.get(uuid);
+            PetSelectionMenu menu = (PetSelectionMenu) adminViewer.clickableMenu();
+            menu.handleAdminClick(e, adminViewer.loadedPlayer());
+        }
+    }
+
+    /**
+     * Stop the player from throwing items when viewing the pet selection inventory
+     */
+    @EventHandler
+    private void onItemDrop(PlayerDropItemEvent e) {
+        ClickableMenu clickableMenu = playersInInventory.get(e.getPlayer().getUniqueId());
+        if (clickableMenu instanceof PetSelectionMenu) e.setCancelled(true);
+    }
+
+    /**
+     * Forces an update of all open pet menus.
+     * This should only be used to save data during a server shutdown.
+     * <p>
+     * This will lock the menu so only the proper viewer's data gets saved.
+     * If this is called and the server is left online, the menu will be glitched.
+     */
+    public void forceUpdateOpenSelectionMenus() {
+        for (Map.Entry<UUID, ClickableMenu> entry : playersInInventory.entrySet()) {
+            if (!(entry.getValue() instanceof PetSelectionMenu menu)) continue;
+
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null) continue;
+
+            menu.pushUpdates(player, playerManager.getLoadedPlayer(player));
+        }
+        for (Map.Entry<UUID, AdminViewer> entry : adminsInInventory.entrySet()) {
+            if (!(entry.getValue().clickableMenu() instanceof PetSelectionMenu menu)) continue;
+
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null) continue;
+
+            menu.pushUpdates(player, entry.getValue().loadedPlayer());
+        }
+    }
+
+    public void closeAllInventories() {
+        for (UUID uuid : playersInInventory.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) player.closeInventory();
+        }
+        for (UUID uuid : adminsInInventory.keySet()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) player.closeInventory();
         }
     }
 

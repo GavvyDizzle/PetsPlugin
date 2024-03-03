@@ -3,37 +3,53 @@ package com.github.gavvydizzle.petsplugin.pets;
 import com.github.gavvydizzle.petsplugin.pets.boost.Boost;
 import com.github.gavvydizzle.petsplugin.pets.boost.BoostType;
 import com.github.gavvydizzle.petsplugin.pets.reward.RewardManager;
+import com.github.gavvydizzle.petsplugin.pets.xp.ExperienceType;
 import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
 import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.Numbers;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Pet implements Comparable<Pet> {
 
-    private final Pattern pattern = Pattern.compile("\\{boost_[A-Za-z0-9]+\\}");
-    private final Pattern patternWithLevel = Pattern.compile("\\{boost_[A-Za-z0-9]+_[0-9]+\\}");
+    private final Pattern pattern = Pattern.compile("\\{boost_[A-Za-z0-9]+}");
+    private final Pattern patternWithLevel = Pattern.compile("\\{boost_[A-Za-z0-9]+_[0-9]+}");
 
     private final String id;
+    private final long lockDurationMilliseconds;
+    private final String permission, permissionDeniedMessage;
+    private final ItemStack itemStack, listItemStack;
     private final int startLevel, maxLevel;
     private final long[] xpPerLevel, totalXpNeeded;
     private final HashMap<BoostType, ArrayList<Boost>> boostsMap;
     private final HashMap<String, Boost> boostsByID;
-    private final ItemStack itemStack, listItemStack;
+    private final Map<ExperienceType, Set<Object>> xpMap;
     private final RewardManager rewardManager;
 
-    public Pet(String id, int startLevel, int maxLevel, List<Long> totalXp, ItemStack itemStack, ItemStack listItemStack, @Nullable RewardManager rewardManager) {
+    public Pet(String id,
+               int lockDurationSeconds,
+               String permission,
+               String permissionDeniedMessage,
+               ItemStack itemStack,
+               ItemStack listItemStack,
+               int startLevel,
+               int maxLevel,
+               List<Long> totalXp,
+               Map<ExperienceType, Set<Object>> xpMap,
+               @Nullable RewardManager rewardManager) {
+
         this.id = id.toLowerCase();
+        this.lockDurationMilliseconds = lockDurationSeconds * 1000L;
+        this.permission = permission.trim();
+        this.permissionDeniedMessage = permissionDeniedMessage;
         this.startLevel = startLevel;
         this.maxLevel = maxLevel;
 
@@ -55,6 +71,7 @@ public class Pet implements Comparable<Pet> {
         this.listItemStack = listItemStack;
         initItemStack();
 
+        this.xpMap = xpMap;
         this.rewardManager = rewardManager;
     }
 
@@ -86,16 +103,38 @@ public class Pet implements Comparable<Pet> {
     }
 
     /**
+     * Determines if this pet subscribes to the given event
+     * @param experienceType The xp type
+     * @param o The key
+     * @return If experience should be given for this event
+     */
+    public boolean subscribesTo(ExperienceType experienceType, Object o) {
+        Set<Object> set = xpMap.get(experienceType);
+        if (set == null) return false;
+
+        return set.contains(o);
+    }
+
+    /**
      * Calculates the level of this pet.
      * @param xp The amount of xp this pet has
      * @return The pet's level
      */
-    public int getLevel(long xp) {
+    public int getLevel(double xp) {
         if (startLevel == maxLevel || xp < totalXpNeeded[0]) return startLevel;
 
-        int level = Arrays.binarySearch(totalXpNeeded, xp+1); // Add 1 to the key to make boundary points count as the next level
+        int level = Arrays.binarySearch(totalXpNeeded, (long) xp+1); // Add 1 to the key to make boundary points count as the next level
         if (level < 0) level = -level - 1;
         return Math.min(level + startLevel, maxLevel);
+    }
+
+    /**
+     * Determines if this pet is at max level
+     * @param xp The amount of xp this pet has
+     * @return If the pet is at max level
+     */
+    public boolean isMaxLevel(double xp) {
+        return getLevel(xp) >= maxLevel;
     }
 
     /**
@@ -104,7 +143,7 @@ public class Pet implements Comparable<Pet> {
      * @return The amount of xp needed for the next level.<p>
      *      0 if the pet is max level
      */
-    public long getXpToNextLevel(long xp) {
+    public long getXpToNextLevel(double xp) {
         int level = getLevel(xp);
 
         if (level == maxLevel) return 0;
@@ -117,7 +156,7 @@ public class Pet implements Comparable<Pet> {
      * @return The amount of xp needed to reach the next level from the current point.<p>
      *     0 if the pet is max level
      */
-    public long getCurrentLevelXp(long xp) {
+    public double getCurrentLevelXp(double xp) {
         int level = getLevel(xp);
 
         if (level == maxLevel) return 0;
@@ -131,7 +170,7 @@ public class Pet implements Comparable<Pet> {
      * @return The amount of xp needed to reach the next level.<p>
      *      0 if the pet is max level
      */
-    public long getCurrentLevelXpRemaining(long xp) {
+    public double getCurrentLevelXpRemaining(double xp) {
         int level = getLevel(xp);
 
         if (level == maxLevel) return 0;
@@ -143,12 +182,12 @@ public class Pet implements Comparable<Pet> {
      * @param xp The amount of xp this pet has
      * @return The ratio of xp to the next level such that 0 <= val < 1. If the pet is max level, 1 will be returned
      */
-    public double getCurrentLevelRatio(long xp) {
+    public double getCurrentLevelRatio(double xp) {
         int level = getLevel(xp);
 
         if (level == maxLevel) return 1;
         // Same as calculating the value of getCurrentLevelXp() / getXpToNextLevel()
-        return getCurrentLevelXp(xp) * 1.0 / xpPerLevel[level - startLevel];
+        return getCurrentLevelXp(xp) / xpPerLevel[level - startLevel];
     }
 
 
@@ -167,22 +206,43 @@ public class Pet implements Comparable<Pet> {
     }
 
     /**
-     * Creates an item representing this pet with the owner stored on the item
+     * Creates an item representing this pet with the owner stored on the item.
+     * This will set the last use time to 0.
      * @param owner The owner
      * @param xp The amount of XP to set this pet to
-     * @return An ItemStack with owner and xp PDC data added
+     * @return An ItemStack with PDC data added
      */
-    public ItemStack getItemStack(OfflinePlayer owner, long xp) {
+    public ItemStack getItemStack(OfflinePlayer owner, double xp) {
+        return getItemStack(owner, xp, 0);
+    }
+
+    public ItemStack getItemStack(UUID uuid, double xp) {
+        return getItemStack(uuid, xp, 0);
+    }
+
+    public ItemStack getItemStack(OfflinePlayer owner, double xp, long lastUseTime) {
+        return getItemStack(owner.getUniqueId(), xp, lastUseTime);
+    }
+
+    /**
+     * Creates an item representing this pet with the owner stored on the item
+     * @param uuid The owner's uuid
+     * @param xp The amount of XP to set this pet to
+     * @param lastUseTime The epoch time of the last equip time
+     * @return An ItemStack with PDC data added
+     */
+    public ItemStack getItemStack(UUID uuid, double xp, long lastUseTime) {
         ItemStack item = itemStack.clone();
-        PDCUtils.setOwner(item, owner);
+        PDCUtils.setOwner(item, uuid);
         PDCUtils.setXP(item, xp);
+        PDCUtils.setUseTime(item, lastUseTime);
         PDCUtils.setRandomKey(item);
 
         int lvl = getLevel(xp);
         String level = String.valueOf(lvl);
         String xpToNextLevel = String.valueOf(getXpToNextLevel(xp));
-        String currentLevelXp = String.valueOf(getCurrentLevelXp(xp));
-        String remainingXpNeeded = String.valueOf(getCurrentLevelXpRemaining(xp));
+        String currentLevelXp = String.valueOf((long) getCurrentLevelXp(xp));
+        String remainingXpNeeded = String.valueOf((long) getCurrentLevelXpRemaining(xp));
         String percentToNextLevel = String.valueOf(Numbers.round(getCurrentLevelRatio(xp) * 100, 2));
 
         ItemMeta meta = item.getItemMeta();
@@ -283,7 +343,27 @@ public class Pet implements Comparable<Pet> {
         return item;
     }
 
+    /**
+     * Checks if the player has permission for this pet
+     * @param player The player
+     * @return True if the player has this permission
+     */
+    public boolean hasPermission(Player player) {
+        if (permission.isBlank()) return true;
+        return player.hasPermission(permission);
+    }
 
+    public void sendPermissionDeniedMessage(Player player) {
+        player.sendMessage(permissionDeniedMessage);
+    }
+
+    public long getLockDurationMilliseconds() {
+        return lockDurationMilliseconds;
+    }
+
+    public Map<ExperienceType, Set<Object>> getXpMap() {
+        return xpMap;
+    }
 
     public RewardManager getRewardManager() {
         return rewardManager;

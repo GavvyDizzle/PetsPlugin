@@ -6,6 +6,7 @@ import com.github.gavvydizzle.petsplugin.gui.item.ItemType;
 import com.github.gavvydizzle.petsplugin.pets.Pet;
 import com.github.gavvydizzle.petsplugin.pets.PetManager;
 import com.github.gavvydizzle.petsplugin.utils.Sounds;
+import com.github.mittenmc.serverutils.gui.ClickableMenu;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;

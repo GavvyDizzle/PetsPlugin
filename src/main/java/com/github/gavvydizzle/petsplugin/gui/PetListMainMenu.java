@@ -1,7 +1,6 @@
 package com.github.gavvydizzle.petsplugin.gui;
 
 import com.github.gavvydizzle.petsplugin.PetsPlugin;
-import com.github.gavvydizzle.petsplugin.configs.MenusConfig;
 import com.github.gavvydizzle.petsplugin.gui.item.InventoryItem;
 import com.github.gavvydizzle.petsplugin.gui.item.ItemType;
 import com.github.gavvydizzle.petsplugin.pets.Pet;
@@ -11,6 +10,7 @@ import com.github.mittenmc.serverutils.ColoredItems;
 import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.ConfigUtils;
 import com.github.mittenmc.serverutils.Numbers;
+import com.github.mittenmc.serverutils.gui.ClickableMenu;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -22,7 +22,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PetListMainMenu implements ClickableMenu {
 
@@ -40,15 +41,13 @@ public class PetListMainMenu implements ClickableMenu {
     }
 
     public void reload() {
-        FileConfiguration config = MenusConfig.get();
-        config.options().copyDefaults(true);
+        FileConfiguration config = PetsPlugin.getConfigManager().get("menus");
+        if (config == null) return;
 
         config.addDefault("pet_list_main_menu.name", "Pet Select");
         config.addDefault("pet_list_main_menu.rows", 3);
         config.addDefault("pet_list_main_menu.filler", "white");
         config.addDefault("pet_list_submenus", new HashMap<>());
-
-        MenusConfig.save();
 
         String inventoryName = Colors.conv(config.getString("pet_list_main_menu.name"));
         int inventorySize = Numbers.constrain(config.getInt("pet_list_main_menu.rows"), 1, 6) * 9;
@@ -59,16 +58,14 @@ public class PetListMainMenu implements ClickableMenu {
             inventory.setItem(i, filler);
         }
 
-        reloadContents();
+        reloadContents(config);
     }
 
     /**
      * Reloads the contents of this menu.
      */
-    public void reloadContents() {
+    public void reloadContents(FileConfiguration config) {
         inventoryItemMap.clear();
-
-        FileConfiguration config = MenusConfig.get();
 
         ConfigurationSection configurationSection = config.getConfigurationSection("pet_list_main_menu.items");
         if (configurationSection == null) return;
@@ -76,7 +73,7 @@ public class PetListMainMenu implements ClickableMenu {
         for (String key : configurationSection.getKeys(false)) {
             String path = "pet_list_main_menu.items." + key;
 
-            ItemType type = ItemType.getType(config.getString(path + ".type"));
+            ItemType type = ItemType.get(config.getString(path + ".type"));
             if (type == null) {
                 PetsPlugin.getInstance().getLogger().warning("Invalid item type for " + path + " in menus.yml");
                 continue;
@@ -89,9 +86,7 @@ public class PetListMainMenu implements ClickableMenu {
             }
 
             switch (type) {
-                case BACK -> {
-                    PetsPlugin.getInstance().getLogger().warning("Back buttons are not allowed in the main menu (" + path + " in menus.yml)");
-                }
+                case BACK -> PetsPlugin.getInstance().getLogger().warning("Back buttons are not allowed in the main menu (" + path + " in menus.yml)");
                 case ITEM -> {
                     ItemStack itemStack = new ItemStack(ConfigUtils.getMaterial(config.getString(path + ".material"), Material.PAPER));
                     ItemMeta meta = itemStack.getItemMeta();

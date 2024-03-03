@@ -1,8 +1,6 @@
 package com.github.gavvydizzle.petsplugin.utils;
 
-import com.github.gavvydizzle.petsplugin.configs.SoundsConfig;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
+import com.github.gavvydizzle.petsplugin.PetsPlugin;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -21,15 +19,13 @@ public class Sounds {
     }
 
     public static void reload() {
-        FileConfiguration config = SoundsConfig.get();
-        config.options().copyDefaults(true);
+        FileConfiguration config = PetsPlugin.getConfigManager().get("sounds");
+        if (config == null) return;
 
         addDefault(config, "generalClickSound", generalClickSound);
         addDefault(config, "generalFailSound", generalFailSound);
         addDefault(config, "pageTurnSound", pageTurnSound);
         addDefault(config, "petLevelUpSound", petLevelUpSound);
-
-        SoundsConfig.save();
 
         generalClickSound = getSound(config, "generalClickSound");
         generalFailSound = getSound(config, "generalFailSound");
@@ -52,7 +48,7 @@ public class Sounds {
                     (float) config.getDouble(root + ".volume"),
                     (float) config.getDouble(root + ".pitch"));
         } catch (Exception e) {
-            Bukkit.getLogger().severe("Failed to load the sound: " + root + ". This sound will be muted until this error is fixed.");
+            PetsPlugin.getInstance().getLogger().severe("Failed to load the sound: " + root + ". This sound will be muted until this error is fixed.");
             return new Sounds(false);
         }
     }

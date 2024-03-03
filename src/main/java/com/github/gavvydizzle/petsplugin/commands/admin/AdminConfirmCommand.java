@@ -22,8 +22,8 @@ public class AdminConfirmCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        PetsPlugin.getInstance().getCommandConfirmationManager().onConfirmCommandRun((Player) sender);
+        if (!(sender instanceof Player player)) return;
+        PetsPlugin.getInstance().getCommandConfirmationManager().onConfirmCommandRun(player);
     }
 
     @Override

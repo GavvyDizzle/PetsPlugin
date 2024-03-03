@@ -50,6 +50,6 @@ public class ResetDatabaseCommand extends SubCommand implements ConfirmationComm
 
     @Override
     public String getConfirmationMessage() {
-        return ChatColor.RED + "Using this command will DELETE ALL SELECTED PETS! Only run `" + getSyntax() + "` if you are certain you want to continue";
+        return ChatColor.RED + "Using this command will DELETE ALL SELECTED PETS! Only run `/petsadmin confirm` if you are certain you want to continue";
     }
 }

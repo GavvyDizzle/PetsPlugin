@@ -1,10 +1,12 @@
 package com.github.gavvydizzle.petsplugin.storage;
 
 import com.github.gavvydizzle.petsplugin.pets.SelectedPet;
-import com.github.mittenmc.serverutils.Pair;
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
+import com.github.gavvydizzle.petsplugin.player.PetHolder;
 import com.github.mittenmc.serverutils.UUIDConverter;
-import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
@@ -12,18 +14,21 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.UUID;
+import java.util.Collection;
 
 public class PlayerData extends PluginDataHolder {
 
-    private final static String tableName = "selected_pets";
+    private final static String profileTableName = "profile_data";
+    private final static String petsTableName = "selected_pets";
 
-    private final static String INSERT_OR_UPDATE_SELECTED_PET = "INSERT INTO " + tableName + "(uuid, petID, xp) VALUES(?,?,?) " +
-            "ON DUPLICATE KEY UPDATE petID=?, xp=?";
-    private final static String LOAD_SELECTED_PET = "SELECT * FROM " + tableName + " WHERE uuid = ?";
-    private final static String DELETE_SELECTED_PET = "DELETE FROM " + tableName + " WHERE uuid = ?";
-    private final static String DELETE_ALL_DATA = "DELETE FROM " + tableName;
+    private final static String LOAD_PROFILE_DATA = "SELECT * FROM " + profileTableName + " WHERE uuid=?;";
+    private final static String LOAD_SELECTED_PETS = "SELECT * FROM " + petsTableName + " WHERE uuid=?;";
+
+    private final static String SAVE_PROFILE_DATA = "REPLACE INTO " + profileTableName + "(uuid, level_up_messages) VALUES(?,?);";
+    private final static String SAVE_SELECTED_PET = "REPLACE INTO " + petsTableName + "(uuid, slot, petID, xp, timestamp) VALUES(?,?,?,?,?);";
+
+    private final static String DELETE_SELECTED_PET = "DELETE FROM " + petsTableName + " WHERE uuid=? AND slot=?;";
+    private final static String DELETE_ALL_DATA = "DELETE FROM " + petsTableName;
 
 
     /**
@@ -37,46 +42,123 @@ public class PlayerData extends PluginDataHolder {
     }
 
     /**
-     * Gets the player's saved selected pet
-     *
+     * Gets the player's profile info and selected pets.
      * @param player The player
-     * @return The player's selected pet and a status ID<p>
-     *     0 - Loaded successfully<p>
-     *     1 - Database error
+     * @return A player's data
      */
-    public Pair<SelectedPet, Integer> getSelectedPet(Player player) {
+    @Nullable
+    public LoadedPlayer getPlayerInfo(OfflinePlayer player) {
         Connection conn;
         try {
             conn = conn();
         } catch (SQLException e) {
             logSQLError("Could not connect to the database", e);
-            return new Pair<>(null, 1);
+            return null;
+        }
+
+        boolean levelUpMessages;
+        SelectedPet[] selectedPets = new SelectedPet[PetHolder.getMaxPets()];
+
+        try {
+            PreparedStatement stmt = conn.prepareStatement(LOAD_PROFILE_DATA);
+            stmt.setBytes(1, UUIDConverter.convert(player.getUniqueId()));
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                levelUpMessages = rs.getBoolean("level_up_messages");
+            }
+            else {
+                levelUpMessages = true;
+            }
+
+        } catch (SQLException e) {
+            logSQLError("Failed to load profile data.", e);
+            return null;
         }
 
         try {
-            PreparedStatement stmt = conn.prepareStatement(LOAD_SELECTED_PET);
+            PreparedStatement stmt = conn.prepareStatement(LOAD_SELECTED_PETS);
             stmt.setBytes(1, UUIDConverter.convert(player.getUniqueId()));
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return new Pair<>(new SelectedPet(rs.getString(2), rs.getLong(3)), 0);
-            } else {
-                return new Pair<>(null, 0);
+
+            while (rs.next()) {
+                int slot = rs.getInt("slot");
+                if (slot < 0 || slot >= selectedPets.length) continue;
+
+                selectedPets[slot] = new SelectedPet(rs.getString("petID"), rs.getDouble("xp"), rs.getLong("timestamp"));
             }
+
         } catch (SQLException e) {
-            logSQLError("Failed to load stored pet.", e);
-            return new Pair<>(null, 1);
+            logSQLError("Failed to load stored pets data.", e);
+            return null;
+        }
+
+        return new LoadedPlayer(player.getUniqueId(), selectedPets, levelUpMessages);
+    }
+
+    /**
+     * Saves a player's profile data.
+     * @param loadedPlayer The LoadedPlayer
+     */
+    public void saveProfileData(LoadedPlayer loadedPlayer) {
+        Connection conn;
+        try {
+            conn = conn();
+        } catch (SQLException e) {
+            logSQLError("Could not connect to the database", e);
+            return;
+        }
+
+        try {
+            PreparedStatement ps = conn.prepareStatement(SAVE_PROFILE_DATA);
+            ps.setBytes(1, UUIDConverter.convert(loadedPlayer.getUuid()));
+            ps.setBoolean(2, loadedPlayer.areLevelUpMessagesOn());
+            ps.execute();
+
+        } catch (SQLException e) {
+            logSQLError("Could not save profile data", e);
         }
     }
 
     /**
-     * Save a player's selected pet. If the pet is null, then their entry will be removed.
+     * Saves all players' profile data.
+     * @param loadedPlayers A list of LoadedPlayers
+     */
+    public boolean saveProfileData(Collection<LoadedPlayer> loadedPlayers) {
+        Connection conn;
+        try {
+            conn = conn();
+        } catch (SQLException e) {
+            logSQLError("Could not connect to the database", e);
+            return false;
+        }
+
+        try {
+            PreparedStatement ps = conn.prepareStatement(SAVE_PROFILE_DATA);
+            for (LoadedPlayer loadedPlayer : loadedPlayers) {
+                ps.setBytes(1, UUIDConverter.convert(loadedPlayer.getUuid()));
+                ps.setBoolean(2, loadedPlayer.areLevelUpMessagesOn());
+                ps.addBatch();
+            }
+            ps.executeBatch();
+
+        } catch (SQLException e) {
+            logSQLError("Could not save profile data", e);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Save a player's selected pets. If a pet is null, then their entry will be removed.
      * If the pet's id is "null" then nothing will change.
      *
-     * @param uuid        The player's uuid
-     * @param selectedPet Their SelectedPet
+     * @param lp The LoadedPlayer
      */
-    public void savePlayerInfo(UUID uuid, @Nullable SelectedPet selectedPet) {
-        if (selectedPet != null && selectedPet.getPetID().equalsIgnoreCase("null")) return;
+    public void saveSelectedPets(@NotNull LoadedPlayer lp) {
+        PetHolder petHolder = lp.getPetHolder();
+        if (!lp.getPetHolder().isDirty()) return;
 
         Connection conn;
         try {
@@ -86,41 +168,45 @@ public class PlayerData extends PluginDataHolder {
             return;
         }
 
-        if (selectedPet != null) {
-            try {
-                PreparedStatement stmt = conn.prepareStatement(INSERT_OR_UPDATE_SELECTED_PET);
-                stmt.setBytes(1, UUIDConverter.convert(uuid));
-                stmt.setString(2, selectedPet.getPetID());
-                stmt.setLong(3, selectedPet.getXp());
-                stmt.setString(4, selectedPet.getPetID());
-                stmt.setLong(5, selectedPet.getXp());
-                stmt.execute();
+        try {
+            PreparedStatement saveStatement = conn.prepareStatement(SAVE_SELECTED_PET);
+            PreparedStatement deleteStatement = conn.prepareStatement(DELETE_SELECTED_PET);
 
-            } catch (SQLException e) {
-                logSQLError("Could not save selected pet", e);
-            }
-        } else {
-            try {
-                PreparedStatement stmt = conn.prepareStatement(DELETE_SELECTED_PET);
-                stmt.setBytes(1, UUIDConverter.convert(uuid));
-                stmt.execute();
+            SelectedPet[] arr = petHolder.getEntries();
+            for (int i = 0; i < arr.length; i++) {
+                SelectedPet selectedPet = arr[i];
 
-            } catch (SQLException e) {
-                logSQLError("Could not delete selected pet", e);
+                if (selectedPet == null) {
+                    deleteStatement.setBytes(1, UUIDConverter.convert(lp.getUuid()));
+                    deleteStatement.setInt(2, i);
+                    deleteStatement.addBatch();
+                }
+                else if (!selectedPet.getPetID().equals("null")) { // The null ID is reserved for errors and should not be overwritten
+                    saveStatement.setBytes(1, UUIDConverter.convert(lp.getUuid()));
+                    saveStatement.setInt(2, i);
+                    saveStatement.setString(3, selectedPet.getPetID());
+                    saveStatement.setDouble(4, selectedPet.getXp());
+                    saveStatement.setLong(5, selectedPet.getLastUseTime());
+                    saveStatement.addBatch();
+                }
             }
+
+            saveStatement.executeBatch();
+            deleteStatement.executeBatch();
+
+        } catch (SQLException e) {
+            logSQLError("Could not save selected pet", e);
         }
     }
 
     /**
      * Save all selected pets. If the pet's id is "null" then nothing will change.
      *
-     * @param selectedPetHashMap The map of UUIDs and SelectedPets
+     * @param loadedPlayers A list of LoadedPlayers
      * @return If the data saved successfully
      */
-    public boolean savePlayerInfo(HashMap<UUID, SelectedPet> selectedPetHashMap) {
-        if (selectedPetHashMap.isEmpty()) {
-            return true;
-        }
+    public boolean saveSelectedPets(Collection<LoadedPlayer> loadedPlayers) {
+        if (loadedPlayers.isEmpty()) return true;
 
         Connection conn;
         try {
@@ -131,20 +217,37 @@ public class PlayerData extends PluginDataHolder {
         }
 
         try {
-            PreparedStatement stmt = conn.prepareStatement(INSERT_OR_UPDATE_SELECTED_PET);
-            for (UUID uuid : selectedPetHashMap.keySet()) {
-                SelectedPet selectedPet = selectedPetHashMap.get(uuid);
-                if (selectedPet == null || selectedPet.getPetID().equalsIgnoreCase("null")) continue;
+            PreparedStatement saveStatement = conn.prepareStatement(SAVE_SELECTED_PET);
+            PreparedStatement deleteStatement = conn.prepareStatement(DELETE_SELECTED_PET);
 
-                stmt.setBytes(1, UUIDConverter.convert(uuid));
-                stmt.setString(2, selectedPet.getPetID());
-                stmt.setLong(3, selectedPet.getXp());
-                stmt.setString(4, selectedPet.getPetID());
-                stmt.setLong(5, selectedPet.getXp());
-                stmt.addBatch();
+            for (LoadedPlayer lp : loadedPlayers) {
+                PetHolder petHolder = lp.getPetHolder();
+                if (!petHolder.isDirty()) continue;
+
+                SelectedPet[] arr = petHolder.getEntries();
+                for (int i = 0; i < arr.length; i++) {
+                    SelectedPet selectedPet = arr[i];
+
+                    if (selectedPet == null) {
+                        deleteStatement.setBytes(1, UUIDConverter.convert(lp.getUuid()));
+                        deleteStatement.setInt(2, i);
+                        deleteStatement.addBatch();
+                    }
+                    else if (!selectedPet.getPetID().equals("null")) { // The null ID is reserved for errors and should not be overwritten
+                        saveStatement.setBytes(1, UUIDConverter.convert(lp.getUuid()));
+                        saveStatement.setInt(2, i);
+                        saveStatement.setString(3, selectedPet.getPetID());
+                        saveStatement.setDouble(4, selectedPet.getXp());
+                        saveStatement.setLong(5, selectedPet.getLastUseTime());
+                        saveStatement.addBatch();
+                    }
+                }
             }
-            stmt.executeBatch();
+
+            saveStatement.executeBatch();
+            deleteStatement.executeBatch();
             return true;
+
         } catch (SQLException e) {
             logSQLError("Could not save all selected pets", e);
             return false;

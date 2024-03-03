@@ -1,14 +1,14 @@
 package com.github.gavvydizzle.petsplugin.pets.reward;
 
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
 import com.github.mittenmc.serverutils.Numbers;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 
 public abstract class RewardsSet {
 
-    protected double rewardPercent;
+    protected final double rewardPercent;
     protected int totalWeight;
     protected final ArrayList<Reward> rewards;
 
@@ -35,14 +35,14 @@ public abstract class RewardsSet {
 
     /**
      * Gives a reward without doing any checks
-     * @param player The player
+     * @param loadedPlayer The player
      */
-    protected void giveReward(Player player) {
+    protected void giveReward(LoadedPlayer loadedPlayer) {
         int num = Numbers.randomNumber(1, totalWeight);
 
         for (Reward reward : rewards) {
             if (num <= reward.getWeight()) {
-                reward.collect(player);
+                reward.collect(loadedPlayer);
                 return;
             }
             num -= reward.getWeight();

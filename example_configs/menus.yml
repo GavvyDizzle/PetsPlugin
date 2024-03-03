@@ -1,21 +1,39 @@
 selection_menu:
   name: Pet Select
-  rows: 4
+  rows: 5
   filler: blue
-  petSlot: 13
-  help:
-    slot: 31
-    material: ALLAY_SPAWN_EGG
-    name: '&bPet Selection Help'
-    lore:
-    - '&7When in this menu:'
-    - '&aClick on a pet in your inventory to select it'
-    - '&eClick on the pet in this menu to deselect it'
-    - ''
-    - '&7While holding a pet in your hand and crouching:'
-    - '&aRight-click your pet to select or swap it'
-    - ''
-    - '&7&oNote: Stacked pets will be deleted if equipped!'
+  lockedPetMessage: '&cYou must wait {time} before removing this pet'
+  lockedMenuMessage: '&cUnable to edit pets at this time'
+  slots:
+    - 12
+    - 13
+    - 14
+    - 21
+    - 22
+    - 23
+    - 30
+    - 31
+    - 32
+  permissions:
+    - petsplugin.petslots.1
+    - petsplugin.petslots.2
+    - petsplugin.petslots.3
+    - petsplugin.petslots.4
+    - petsplugin.petslots.5
+    - petsplugin.petslots.6
+    - petsplugin.petslots.7
+    - petsplugin.petslots.8
+    - petsplugin.petslots.9
+  items:
+    toggle_level_up_messages:
+      placeholder:
+        enabled: '&aEnabled'
+        disabled: '&cDisabled'
+      slot: 8
+      material: OAK_SIGN
+      name: '&eToggle Level Up Messages'
+      lore:
+        - '&7Status: {status}'
 pet_list_main_menu:
   name: Pet List
   rows: 3

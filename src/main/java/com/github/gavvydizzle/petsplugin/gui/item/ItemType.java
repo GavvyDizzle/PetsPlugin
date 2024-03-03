@@ -9,7 +9,7 @@ public enum ItemType {
     PET;
 
     @Nullable
-    public static ItemType getType(@Nullable String str) {
+    public static ItemType get(@Nullable String str) {
         if (str == null) return null;
 
         for (ItemType itemType : ItemType.values()) {

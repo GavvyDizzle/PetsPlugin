@@ -2,10 +2,6 @@ package com.github.gavvydizzle.petsplugin.commands.admin;
 
 import com.github.gavvydizzle.petsplugin.PetsPlugin;
 import com.github.gavvydizzle.petsplugin.commands.AdminCommandManager;
-import com.github.gavvydizzle.petsplugin.configs.CommandsConfig;
-import com.github.gavvydizzle.petsplugin.configs.MenusConfig;
-import com.github.gavvydizzle.petsplugin.configs.MessagesConfig;
-import com.github.gavvydizzle.petsplugin.configs.SoundsConfig;
 import com.github.gavvydizzle.petsplugin.utils.Messages;
 import com.github.gavvydizzle.petsplugin.utils.Sounds;
 import com.github.mittenmc.serverutils.SubCommand;
@@ -36,6 +32,7 @@ public class ReloadCommand extends SubCommand {
         argsList.add("messages");
         argsList.add("pets");
         argsList.add("sounds");
+        argsList.add("xp");
     }
 
     @Override
@@ -57,20 +54,28 @@ public class ReloadCommand extends SubCommand {
                 case "pets" -> {
                     reloadPets(true);
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded all pets");
+                    PetsPlugin.getInstance().getExperienceManager().validateExperienceEntries(sender);
                 }
                 case "sounds" -> {
                     reloadSounds();
                     sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded all sounds");
                 }
+                case "xp" -> {
+                    reloadXP();
+                    sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded global xp");
+                    PetsPlugin.getInstance().getExperienceManager().validateExperienceEntries(sender);
+                }
             }
         }
         else {
             reloadCommands();
+            reloadXP(); // Must reload before pets
             reloadPets(false); // Must reload before GUI
             reloadGUI();
             reloadMessages();
             reloadSounds();
             sender.sendMessage(ChatColor.GREEN + "[" + PetsPlugin.getInstance().getName() + "] " + "Successfully reloaded");
+            PetsPlugin.getInstance().getExperienceManager().validateExperienceEntries(sender);
         }
     }
 
@@ -86,18 +91,21 @@ public class ReloadCommand extends SubCommand {
     }
 
     private void reloadCommands() {
-        CommandsConfig.reload();
+        PetsPlugin.getConfigManager().reload("commands");
         adminCommandManager.reload();
+        PetsPlugin.getConfigManager().save("commands");
     }
 
     private void reloadGUI() {
-        MenusConfig.reload();
+        PetsPlugin.getConfigManager().reload("menus");
         PetsPlugin.getInstance().getInventoryManager().reload();
+        PetsPlugin.getConfigManager().save("menus");
     }
 
     private void reloadMessages() {
-        MessagesConfig.reload();
+        PetsPlugin.getConfigManager().reload("messages");
         Messages.reloadMessages();
+        PetsPlugin.getConfigManager().save("messages");
     }
 
     private void reloadPets(boolean updateMenuPets) {
@@ -109,8 +117,15 @@ public class ReloadCommand extends SubCommand {
     }
 
     private void reloadSounds() {
-        SoundsConfig.reload();
+        PetsPlugin.getConfigManager().reload("sounds");
         Sounds.reload();
+        PetsPlugin.getConfigManager().save("sounds");
+    }
+
+    private void reloadXP() {
+        PetsPlugin.getConfigManager().reload("xp");
+        PetsPlugin.getInstance().getExperienceManager().reload();
+        PetsPlugin.getConfigManager().save("xp");
     }
 
 }

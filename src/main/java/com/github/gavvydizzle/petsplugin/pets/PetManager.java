@@ -1,25 +1,25 @@
 package com.github.gavvydizzle.petsplugin.pets;
 
-import com.cryptomorin.xseries.SkullUtils;
 import com.github.gavvydizzle.petsplugin.PetsPlugin;
+import com.github.gavvydizzle.petsplugin.gui.InventoryManager;
 import com.github.gavvydizzle.petsplugin.pets.boost.*;
 import com.github.gavvydizzle.petsplugin.pets.reward.*;
-import com.github.gavvydizzle.petsplugin.storage.PlayerData;
+import com.github.gavvydizzle.petsplugin.pets.xp.ExperienceType;
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
+import com.github.gavvydizzle.petsplugin.player.PetHolder;
+import com.github.gavvydizzle.petsplugin.player.PlayerManager;
 import com.github.gavvydizzle.petsplugin.utils.Messages;
 import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
-import com.github.gavvydizzle.petsplugin.utils.Sounds;
-import com.github.gavvydizzle.prisonmines.api.PrisonMinesAPI;
 import com.github.mittenmc.serverutils.Colors;
-import com.github.mittenmc.serverutils.Pair;
-import com.github.mittenmc.serverutils.RepeatingTask;
+import com.github.mittenmc.serverutils.SkullUtils;
 import me.gavvydizzle.minerewards.events.RewardFindEvent;
 import me.gavvydizzle.minerewards.events.RewardSearchEvent;
-import me.gavvydizzle.playerlevels.events.GivePlayerExperienceEvent;
 import me.wax.prisonenchants.enchants.EnchantIdentifier;
 import me.wax.prisonenchants.events.AttemptEnchantActivationEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.EntityType;
@@ -27,97 +27,79 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.potion.PotionEffectType;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 public class PetManager implements Listener {
 
-    private final static int AUTO_SAVE_SECONDS = 300;
-    private final static int PET_SWAP_MILLIS_DELAY = 500;
-    private final static Pattern petIDPattern = Pattern.compile("[\\w]*");
+    private final static Pattern petIDPattern = Pattern.compile("\\w*");
 
     private final File petsDirectory;
     private final PetsPlugin instance;
-    private final PlayerData data;
-    private final PrisonMinesAPI prisonMinesAPI;
+    private final PlayerManager playerManager;
     private final HashMap<String, Pet> petHashMap;
-    private final HashMap<UUID, SelectedPet> selectedPets;
-    private final HashMap<UUID, Long> lastSwapTimeMap;
 
     private boolean isCheckingPetOwner;
 
-    public PetManager(PetsPlugin instance, PlayerData data) {
+    public PetManager(PetsPlugin instance, PlayerManager playerManager) {
         this.instance = instance;
-        this.data = data;
-        prisonMinesAPI = PrisonMinesAPI.getInstance();
+        this.playerManager = playerManager;
+
         petsDirectory = new File(instance.getDataFolder(), "pets");
         petHashMap = new HashMap<>();
-        selectedPets = new HashMap<>();
-        lastSwapTimeMap = new HashMap<>();
 
-        startAutoSaving();
         reload();
-    }
-
-    private void startAutoSaving() {
-        new RepeatingTask(instance, AUTO_SAVE_SECONDS * 20, AUTO_SAVE_SECONDS * 20) {
-            @Override
-            public void run() {
-                if (!selectedPets.isEmpty())
-                    Bukkit.getScheduler().runTaskAsynchronously(instance, () -> {
-                        if (!data.savePlayerInfo(selectedPets)) {
-                            instance.getLogger().severe("Failed to auto-save selected pets");
-                        }
-                    });
-            }
-        };
+        playerManager.loadOnlinePlayers();
     }
 
     /**
-     * Saves plugin data on server shutdown
-     * @return If the data saved successfully
+     * Handles when this plugin disables.
      */
-    public boolean saveDataOnShutdown() {
-        return data.savePlayerInfo(selectedPets);
+    public void onShutdown() {
+        stopAllBoosts();
+    }
+
+    /**
+     * Closes all open inventories and saves data before reloading the plugin
+     */
+    private void closeOpenInventories() {
+        InventoryManager inventoryManager = instance.getInventoryManager();
+        if (inventoryManager != null) {
+            inventoryManager.forceUpdateOpenSelectionMenus();
+            inventoryManager.closeAllInventories();
+            inventoryManager.getPetMenu().unblockSaving();
+        }
     }
 
     /**
      * Loads all pets from .yml files in the /pets/ subdirectory
      */
     public void reload() {
+        closeOpenInventories();
+
         isCheckingPetOwner = instance.getConfig().getBoolean("checkPetOwner");
 
-        HashMap<UUID, SelectedPet> selectedPetsClone = new HashMap<>(selectedPets);
-
         // Remove old selected pets
-        for (UUID uuid : selectedPetsClone.keySet()) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player == null) continue;
-
-            SelectedPet selectedPet = selectedPetsClone.get(uuid);
-
-            Pet oldPet = petHashMap.get(selectedPet.getPetID());
-            if (oldPet != null) {
-                stopPotionBoosts(player, oldPet);
+        for (LoadedPlayer loadedPlayer : playerManager.getPlayers()) {
+            for (SelectedPet selectedPet : loadedPlayer.getPetHolder().getEntries()) {
+                Pet oldPet = getFromSelectedPet(selectedPet);
+                if (oldPet != null) {
+                    stopPetBoosts(loadedPlayer.getPlayer(), oldPet);
+                }
             }
-
-            selectedPets.remove(player.getUniqueId());
         }
 
         petHashMap.clear();
@@ -129,8 +111,7 @@ public class PetManager implements Listener {
                     try {
                         loadPet(file);
                     } catch (Exception e) {
-                        instance.getLogger().severe("Failed to load pet from " + file.getName() + "!");
-                        e.printStackTrace();
+                        instance.getLogger().log(Level.SEVERE, "Failed to load pet from " + file.getName() + "!", e);
                     }
                 }
             }
@@ -139,22 +120,20 @@ public class PetManager implements Listener {
         instance.getLogger().info("Loaded " + petHashMap.size() + " pets!");
 
         // Reload old selected pets
-        for (UUID uuid : selectedPetsClone.keySet()) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player == null) continue;
+        for (LoadedPlayer loadedPlayer : playerManager.getPlayers()) {
+            for (SelectedPet selectedPet : loadedPlayer.getPetHolder().getEntries()) {
+                if (selectedPet == null) continue;
 
-            SelectedPet selectedPet = selectedPetsClone.get(uuid);
-            selectedPets.put(player.getUniqueId(), selectedPet);
+                String newPetID = selectedPet.getPetID();
+                if (newPetID == null || isInvalidPet(newPetID)) {
+                    loadedPlayer.sendMessage(Messages.petInvalidAfterReload.replace("{id}", selectedPet.getPetID()));
+                    return;
+                }
 
-            String newPetID = selectedPet.getPetID();
-            if (newPetID == null || !petHashMap.containsKey(newPetID)) {
-                player.sendMessage(Messages.petInvalidAfterReload.replace("{id}", selectedPet.getPetID()));
-                return;
-            }
-
-            Pet newPet = petHashMap.get(newPetID);
-            if (newPet != null) {
-                startPotionBoosts(player, newPet);
+                Pet newPet = petHashMap.get(newPetID);
+                if (newPet != null) {
+                    startPetBoosts(loadedPlayer.getPlayer(), newPet);
+                }
             }
         }
     }
@@ -167,6 +146,9 @@ public class PetManager implements Listener {
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);
         config.options().copyDefaults(true);
         config.addDefault("id", "todo");
+        config.addDefault("lockDurationSeconds", 0);
+        config.addDefault("permission", "");
+        config.addDefault("permissionDenied", "&cYou don't have permission to equip this pet");
         config.addDefault("item.name", "&eName");
         config.addDefault("item.skullLink", "");
         config.addDefault("item.lore", new ArrayList<>());
@@ -178,8 +160,7 @@ public class PetManager implements Listener {
         try {
             config.save(file);
         } catch (Exception e) {
-            instance.getLogger().severe("Failed to save " + file.getName());
-            e.printStackTrace();
+            instance.getLogger().log(Level.SEVERE, "Failed to save " + file.getName(), e);
             return;
         }
 
@@ -206,6 +187,9 @@ public class PetManager implements Listener {
             return;
         }
 
+        int lockDurationSeconds = config.getInt("lockDurationSeconds");
+        String permission = config.getString("permission", "");
+        String permissionDeniedMessage = Colors.conv(config.getString("permissionDenied"));
         int startLevel = config.getInt("levels.startLevel");
         int maxLevel = config.getInt("levels.maxLevel");
         List<Long> totalXp = config.getLongList("levels.amounts");
@@ -230,14 +214,14 @@ public class PetManager implements Listener {
                     "The last " + (totalXp.size() - neededLevels) + " level(s) are being ignored");
         }
 
-        ItemStack itemStack = new ItemStack(Material.PLAYER_HEAD);
-        assert itemStack.getItemMeta() != null;
         String skillLink = config.getString("item.skullLink");
         if (skillLink == null) {
             instance.getLogger().severe("No skull link given in " + file.getName());
             return;
         }
-        SkullMeta meta = SkullUtils.applySkin(itemStack.getItemMeta(), skillLink);
+        ItemStack itemStack = SkullUtils.getSkull(skillLink);
+        ItemMeta meta = itemStack.getItemMeta();
+        assert meta != null;
         meta.setDisplayName(Colors.conv(config.getString("item.name")));
         meta.setLore(Colors.conv(config.getStringList("item.lore")));
         itemStack.setItemMeta(meta);
@@ -249,119 +233,183 @@ public class PetManager implements Listener {
         meta2.setLore(Colors.conv(config.getStringList("menu_item.lore")));
         listItem.setItemMeta(meta2);
 
+        Map<ExperienceType, Set<Object>> xpMap = new HashMap<>();
+        for (ExperienceType experienceType : ExperienceType.values()) {
+            Set<Object> set = loadXPSection(config.getConfigurationSection("xp"), experienceType);
+
+            if (set != null && !set.isEmpty()) {
+                xpMap.put(experienceType, set);
+            }
+        }
+
         RewardManager rewardManager = generateRewardManager(config, file.getName());
 
-        Pet pet = new Pet(id, startLevel, maxLevel, totalXp, itemStack, listItem, rewardManager);
+        Pet pet = new Pet(id, lockDurationSeconds, permission, permissionDeniedMessage, itemStack, listItem, startLevel, maxLevel, totalXp, xpMap, rewardManager);
         petHashMap.put(pet.getId(), pet);
 
-        if (config.getConfigurationSection("boosts") != null) {
-            for (String key : Objects.requireNonNull(config.getConfigurationSection("boosts")).getKeys(false)) {
-                String path = "boosts." + key;
+        ConfigurationSection section = config.getConfigurationSection("boosts");
+        if (section != null) {
+            readBoosts(section, pet, file.getName());
+        }
+    }
 
-                BoostType boostType = BoostType.getBoostType(config.getString(path + ".type"));
-                if (boostType == null) {
-                    instance.getLogger().severe("Boost type missing " + file.getName() + " " + path);
-                    return;
-                }
+    /**
+     * Reads in all boosts for this pet
+     * @param section The configuration section to read from
+     * @param pet The pet to apply the boosts to
+     */
+    private void readBoosts(@NotNull ConfigurationSection section, @NotNull Pet pet, String fileName) {
+        for (String key : section.getKeys(false)) {
+            String path = "boosts." + key;
+            ConfigurationSection boostSection = section.getConfigurationSection(key);
+            if (boostSection == null) continue;
 
-                String multiplierEquation;
-                boolean isMultiplicative;
+            BoostType boostType = BoostType.get(boostSection.getString("type"));
+            if (boostType == null) {
+                instance.getLogger().severe("Boost type missing " + fileName + " " + path);
+                return;
+            }
 
-                if (boostType == BoostType.DAMAGE) {
-                    multiplierEquation = config.getString(path + ".multiplier");
+
+            String multiplierEquation;
+            boolean isMultiplicative;
+
+            switch (boostType) {
+                case DAMAGE -> {
+                    multiplierEquation = boostSection.getString("multiplier");
                     if (multiplierEquation == null) {
-                        instance.getLogger().severe("Multiplier missing " + file.getName() + " " + path);
+                        instance.getLogger().severe("Multiplier missing " + fileName + " " + path);
                         continue;
                     }
 
-                    boolean allowAll = config.getBoolean(path + ".allowAll");
+                    boolean allowAll = boostSection.getBoolean("allowAll");
                     if (allowAll) {
                         pet.addBoost(new DamageBoost(key, null, multiplierEquation));
                     }
                     else {
                         ArrayList<EntityType> entityTypes = new ArrayList<>();
-                        for (String s : config.getStringList(path + ".whitelist")) {
+                        for (String s : boostSection.getStringList("whitelist")) {
                             try {
                                 entityTypes.add(EntityType.valueOf(s.toUpperCase()));
                             } catch (Exception ignored) {
-                                instance.getLogger().warning("Invalid EntityType '" + s + "' at " + file.getName() + " " + path + ".whitelist");
+                                instance.getLogger().warning("Invalid EntityType '" + s + "' at " + fileName + " " + path + ".whitelist");
                             }
                         }
                         pet.addBoost(new DamageBoost(key, entityTypes, multiplierEquation));
                     }
                 }
-                else if (boostType == BoostType.DOUBLE_REWARD) {
-                    String rewardID = config.getString(path + ".rewardID");
+                case DOUBLE_REWARD -> {
+                    String rewardID = boostSection.getString("rewardID");
                     if (rewardID == null) {
-                        instance.getLogger().severe("Reward ID missing " + file.getName() + " " + path);
+                        instance.getLogger().severe("Reward ID missing " + fileName + " " + path);
                         continue;
                     }
-                    String percentChanceEquation = config.getString(path + ".percent");
-                    String message = Colors.conv(config.getString(path + ".message"));
+                    String percentChanceEquation = boostSection.getString("percent");
+                    String message = Colors.conv(boostSection.getString("message"));
 
                     pet.addBoost(new RewardDoublerBoost(key, rewardID, percentChanceEquation, message));
                 }
-                else if (boostType == BoostType.GENERAL_REWARD) {
-                    multiplierEquation = config.getString(path + ".multiplier");
+                case GENERAL_REWARD -> {
+                    multiplierEquation = boostSection.getString("multiplier");
                     if (multiplierEquation == null) {
-                        instance.getLogger().severe("Multiplier missing " + file.getName() + " " + path);
+                        instance.getLogger().severe("Multiplier missing " + fileName + " " + path);
                         continue;
                     }
-                    isMultiplicative = config.getBoolean(path + ".isMultiplicative");
+                    isMultiplicative = boostSection.getBoolean("isMultiplicative");
 
                     pet.addBoost(new GeneralRewardBoost(key, multiplierEquation, isMultiplicative));
                 }
-                else if (boostType == BoostType.ENCHANT) {
-                    multiplierEquation = config.getString(path + ".multiplier");
+                case ENCHANT -> {
+                    multiplierEquation = boostSection.getString("multiplier");
                     if (multiplierEquation == null) {
-                        instance.getLogger().severe("Multiplier missing " + file.getName() + " " + path);
+                        instance.getLogger().severe("Multiplier missing " + fileName + " " + path);
                         continue;
                     }
-                    isMultiplicative = config.getBoolean(path + ".isMultiplicative");
+                    isMultiplicative = boostSection.getBoolean("isMultiplicative");
 
-                    boolean allowAll = config.getBoolean(path + ".allowAll");
+                    boolean allowAll = boostSection.getBoolean("allowAll");
                     if (allowAll) {
                         pet.addBoost(new EnchantBoost(key, null, multiplierEquation, isMultiplicative));
                     }
                     else {
                         ArrayList<EnchantIdentifier> enchantIdentifiers = new ArrayList<>();
-                        for (String s : config.getStringList(path + ".whitelist")) {
+                        for (String s : boostSection.getStringList("whitelist")) {
                             try {
                                 enchantIdentifiers.add(EnchantIdentifier.valueOf(s));
                             } catch (Exception e) {
-                                instance.getLogger().warning("Enchant not found '" + s + "' at " + file.getName() + " " + path + ".whitelist");
+                                instance.getLogger().warning("Enchant not found '" + s + "' at " + fileName + " " + path + ".whitelist");
                             }
                         }
                         pet.addBoost(new EnchantBoost(key, enchantIdentifiers, multiplierEquation, isMultiplicative));
                     }
                 }
-                else if (boostType == BoostType.POTION_EFFECT) {
+                case POTION_EFFECT -> {
                     PotionEffectType potionEffectType;
                     try {
-                        potionEffectType = PotionEffectType.getByName(Objects.requireNonNull(config.getString(path + ".effect")));
+                        potionEffectType = PotionEffectType.getByName(Objects.requireNonNull(boostSection.getString("effect")));
                         if (potionEffectType == null) throw new RuntimeException("Null potion effect type");
                     } catch (Exception e) {
-                        instance.getLogger().severe("Potion effect not found " + file.getName() + " " + path);
+                        instance.getLogger().severe("Potion effect not found " + fileName + " " + path);
                         continue;
                     }
 
-                    int amplifier = config.getInt(path + ".amplifier");
+                    int amplifier = boostSection.getInt("amplifier");
 
                     pet.addBoost(new PotionEffectBoost(key, potionEffectType, amplifier));
                 }
-                else if (boostType == BoostType.XP) {
-                    multiplierEquation = config.getString(path + ".multiplier");
+                case XP -> {
+                    multiplierEquation = boostSection.getString("multiplier");
                     if (multiplierEquation == null) {
-                        instance.getLogger().severe("Multiplier missing " + file.getName() + " " + path);
+                        instance.getLogger().severe("Multiplier missing " + fileName + " " + path);
                         continue;
                     }
 
-                    isMultiplicative = config.getBoolean(path + ".isMultiplicative");
+                    isMultiplicative = boostSection.getBoolean("isMultiplicative");
 
                     pet.addBoost(new XpBoost(key, multiplierEquation, isMultiplicative));
                 }
             }
         }
+    }
+
+    /**
+     * Generates a map of keys and their xp amount.
+     * @param topSection The ConfigurationSection containing all XP subsections
+     * @param experienceType The xp type
+     * @return A map or null
+     */
+    @Nullable
+    public Set<Object> loadXPSection(@Nullable ConfigurationSection topSection, ExperienceType experienceType) {
+        if (topSection == null) return null;
+
+        topSection.addDefault(experienceType.name(), new ArrayList<>());
+
+        Set<Object> set = new HashSet<>();
+        for (String key : topSection.getStringList(experienceType.name())) {
+            Object o = null;
+            switch (experienceType) {
+                case MINING -> {
+                    try {
+                        o = Material.valueOf(key);
+                    } catch (Exception ignored) {
+                        instance.getLogger().warning("Invalid Material for " + experienceType.name() + "." + key + " in xp.yml. This entry will be ignored");
+                        continue;
+                    }
+                }
+                case KILLING -> {
+                    try {
+                        o = EntityType.valueOf(key);
+                    } catch (Exception ignored) {
+                        instance.getLogger().warning("Invalid EntityType for " + experienceType.name() + "." + key + " in xp.yml. This entry will be ignored");
+                        continue;
+                    }
+                }
+            }
+
+            set.add(o);
+        }
+
+        return set;
     }
 
     @Nullable
@@ -441,125 +489,78 @@ public class PetManager implements Listener {
         return rewardManager;
     }
 
-    @EventHandler
-    private void onPlayerJoin(PlayerJoinEvent e) {
-        Bukkit.getScheduler().runTaskAsynchronously(instance, () -> {
-            Pair<SelectedPet, Integer> pair = data.getSelectedPet(e.getPlayer());
-            if (pair.second() == 1) {
-                e.getPlayer().sendMessage("&cAn error occurred when loading your pet. You will not be able to change your pet. Please alert a staff member!");
-                selectedPets.put(e.getPlayer().getUniqueId(), new SelectedPet("null", 0));
-                return;
-            }
-
-            SelectedPet selectedPet = pair.first();
-            if (selectedPet != null) {
-                Bukkit.getScheduler().runTask(instance, () -> onPlayerJoinLoadPet(e.getPlayer(), selectedPet));
-            }
-        });
-    }
-
-    @EventHandler
-    private void onPlayerQuit(PlayerQuitEvent e) {
-        lastSwapTimeMap.remove(e.getPlayer().getUniqueId());
-        Bukkit.getScheduler().runTaskAsynchronously(instance, () ->
-                data.savePlayerInfo(e.getPlayer().getUniqueId(), selectedPets.remove(e.getPlayer().getUniqueId())));
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onRewardFind(RewardFindEvent e)  {
-        Pet pet = getSelectedPet(e.getPlayer());
-        if (pet == null) return;
+        PetHolder petHolder = playerManager.getSelectedPets(e.getPlayer());
+        if (petHolder == null) return;
 
-        SelectedPet selectedPet = selectedPets.get(e.getPlayer().getUniqueId());
-        int level = pet.getLevel(selectedPet.getXp());
+        for (SelectedPet selectedPet : petHolder.getEntries()) {
+            Pet pet = getFromSelectedPet(selectedPet);
+            if (pet == null) return;
 
-        for (Boost boost : pet.getBoostsByType(BoostType.DOUBLE_REWARD)) {
-            RewardDoublerBoost b = (RewardDoublerBoost) boost;
+            int level = pet.getLevel(selectedPet.getXp());
 
-            if (b.getRewardID().equalsIgnoreCase(e.getReward().getId())) {
+            for (Boost boost : pet.getBoostsByType(BoostType.DOUBLE_REWARD)) {
+                RewardDoublerBoost b = (RewardDoublerBoost) boost;
 
-                if (b.shouldActivate(level)) {
-                    e.getReward().executeCommand(e.getPlayer());
-                    b.sendMessage(e.getPlayer());
+                if (b.getRewardID().equalsIgnoreCase(e.getReward().getId())) {
+
+                    if (b.shouldActivate(level)) {
+                        e.getReward().executeCommand(e.getPlayer());
+                        b.sendMessage(e.getPlayer());
+                    }
+
                 }
-
             }
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onRewardSearch(RewardSearchEvent e)  {
-        Pet pet = getSelectedPet(e.getPlayer());
-        if (pet == null) return;
+        PetHolder petHolder = playerManager.getSelectedPets(e.getPlayer());
+        if (petHolder == null) return;
 
-        SelectedPet selectedPet = selectedPets.get(e.getPlayer().getUniqueId());
-        int level = pet.getLevel(selectedPet.getXp());
+        for (SelectedPet selectedPet : petHolder.getEntries()) {
+            Pet pet = getFromSelectedPet(selectedPet);
+            if (pet == null) return;
 
-        for (Boost boost : pet.getBoostsByType(BoostType.GENERAL_REWARD)) {
-            GeneralRewardBoost b = (GeneralRewardBoost) boost;
+            int level = pet.getLevel(selectedPet.getXp());
 
-            if (b.isMultiplicative()) {
-                e.multiply(b.getMultiplier(level));
-            }
-            else {
-                e.add(b.getMultiplier(level));
+            for (Boost boost : pet.getBoostsByType(BoostType.GENERAL_REWARD)) {
+                GeneralRewardBoost b = (GeneralRewardBoost) boost;
+
+                if (b.isMultiplicative()) {
+                    e.multiply(b.getMultiplier(level));
+                }
+                else {
+                    e.add(b.getMultiplier(level));
+                }
             }
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onEnchantAttempt(AttemptEnchantActivationEvent e) {
-        Pet pet = getSelectedPet(e.getPlayer());
-        if (pet == null) return;
+        PetHolder petHolder = playerManager.getSelectedPets(e.getPlayer());
+        if (petHolder == null) return;
 
-        SelectedPet selectedPet = selectedPets.get(e.getPlayer().getUniqueId());
-        int level = pet.getLevel(selectedPet.getXp());
+        for (SelectedPet selectedPet : petHolder.getEntries()) {
+            Pet pet = getFromSelectedPet(selectedPet);
+            if (pet == null) return;
 
-        for (Boost boost : pet.getBoostsByType(BoostType.ENCHANT)) {
-            EnchantBoost b = (EnchantBoost) boost;
-            if (b.shouldBoostEnchant(e.getEnchant().getEnchantIdentifier())) {
+            int level = pet.getLevel(selectedPet.getXp());
 
-                if (b.isMultiplicative()) {
-                    e.multiplyActivationChance(b.getMultiplier(level));
+            for (Boost boost : pet.getBoostsByType(BoostType.ENCHANT)) {
+                EnchantBoost b = (EnchantBoost) boost;
+                if (b.shouldBoostEnchant(e.getEnchant().getEnchantIdentifier())) {
+
+                    if (b.isMultiplicative()) {
+                        e.multiplyActivationChance(b.getMultiplier(level));
+                    }
+                    else {
+                        e.setActivationChance(e.getActivationChance() + b.getMultiplier(level));
+                    }
                 }
-                else {
-                    e.setActivationChance(e.getActivationChance() + b.getMultiplier(level));
-                }
-            }
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    private void onXPGain(GivePlayerExperienceEvent e) {
-        Pet pet = getSelectedPet(e.getPlayer());
-        if (pet == null) return;
-
-        SelectedPet selectedPet = selectedPets.get(e.getPlayer().getUniqueId());
-        if (selectedPet == null) return;
-
-        // Using the PlayerLevels xp system to add pet xp
-        int oldLevel = pet.getLevel(selectedPet.getXp());
-        selectedPet.addXP((long) e.getDefaultXp());
-
-        int newLevel = pet.getLevel(selectedPet.getXp());
-
-        for (Boost boost : pet.getBoostsByType(BoostType.XP)) {
-            XpBoost b = (XpBoost) boost;
-
-            if (b.isMultiplicative()) {
-                e.multiply(b.getMultiplier(newLevel));
-            }
-            else {
-                e.add(b.getMultiplier(newLevel));
-            }
-        }
-
-        if (oldLevel != newLevel) {
-            if (!Messages.petLevelUpMessage.isEmpty()) {
-                e.getPlayer().sendMessage(Messages.petLevelUpMessage
-                        .replace("{pet_name}", pet.getPetName(newLevel))
-                        .replace("{lvl}", String.valueOf(newLevel))
-                );
             }
         }
     }
@@ -568,71 +569,21 @@ public class PetManager implements Listener {
     private void onEntityDamage(EntityDamageByEntityEvent e) {
         if (!(e.getDamager() instanceof Player player)) return;
 
-        Pet pet = getSelectedPet(player);
-        if (pet == null) return;
+        PetHolder petHolder = playerManager.getSelectedPets(player);
+        if (petHolder == null) return;
 
-        SelectedPet selectedPet = selectedPets.get(player.getUniqueId());
-        int level = pet.getLevel(selectedPet.getXp());
+        for (SelectedPet selectedPet : petHolder.getEntries()) {
+            Pet pet = getFromSelectedPet(selectedPet);
+            if (pet == null) return;
 
-        for (Boost boost : pet.getBoostsByType(BoostType.DAMAGE)) {
-            DamageBoost b = (DamageBoost) boost;
-            if (b.shouldBoostDamage(e.getEntityType())) {
-                e.setDamage(e.getDamage() * b.getMultiplier(level));
-            }
-        }
-    }
+            int level = pet.getLevel(selectedPet.getXp());
 
-    @EventHandler
-    private void onPetShiftClick(PlayerInteractEvent e) {
-        if (e.getPlayer().isSneaking() && e.getAction() == Action.RIGHT_CLICK_AIR) {
-            ItemStack heldPet =  e.getPlayer().getInventory().getItemInMainHand();
-            if (heldPet.getType() == Material.AIR) return;
-
-            // Check to see if the petID exists
-            String petID = PDCUtils.getPetId(heldPet);
-            if (petID == null) return;
-            else if (isInvalidPet(petID)) {
-                e.getPlayer().sendMessage(Messages.invalidPetSelect.replace("{id}", petID));
-                Sounds.generalFailSound.playSound(e.getPlayer());
-                return;
-            }
-
-            // Check to see if the player is the owner of the pet
-            if (isCheckingPetOwner) {
-                UUID ownerUUID = PDCUtils.getOwnerUUID(heldPet);
-                if (ownerUUID == null || !ownerUUID.equals(e.getPlayer().getUniqueId())) {
-                    e.getPlayer().sendMessage(Messages.notPetOwnerOnSelect);
-                    Sounds.generalFailSound.playSound(e.getPlayer());
-                    return;
+            for (Boost boost : pet.getBoostsByType(BoostType.DAMAGE)) {
+                DamageBoost b = (DamageBoost) boost;
+                if (b.shouldBoostDamage(e.getEntityType())) {
+                    e.setDamage(e.getDamage() * b.getMultiplier(level));
                 }
             }
-
-            // Pet is now valid
-
-            // Check for quick swap
-            if (isOnSwapCooldown(e.getPlayer())) {
-                e.getPlayer().sendMessage(Messages.swappingPetTooFast);
-                Sounds.generalFailSound.playSound(e.getPlayer());
-                return;
-            }
-
-            // Collect old selected pet if one exists
-            Pet pet = getSelectedPet(e.getPlayer());
-            ItemStack selectedPetItem = null;
-            if (pet == null) {
-                if (selectedPets.containsKey(e.getPlayer().getUniqueId())) { // Selected pet has invalid ID
-                    e.getPlayer().sendMessage(Messages.selectedPetInvalid.replace("{id}", selectedPets.get(e.getPlayer().getUniqueId()).getPetID()));
-                    return;
-                }
-            }
-            else {
-                selectedPetItem = pet.getItemStack(e.getPlayer(), getSelectedPetXP(e.getPlayer()));
-            }
-
-            // Move new pet
-            e.getPlayer().getInventory().setItem(e.getPlayer().getInventory().getHeldItemSlot(), selectedPetItem != null ? selectedPetItem : new ItemStack(Material.AIR));
-            onPetSelect(e.getPlayer(), heldPet);
-            Sounds.generalClickSound.playSound(e.getPlayer());
         }
     }
 
@@ -644,108 +595,128 @@ public class PetManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
-    private void onMineBlockBreak(BlockBreakEvent e) {
-        Pet pet = getSelectedPet(e.getPlayer());
-        if (pet == null) return;
+    private void onBlockBreak(BlockBreakEvent e) {
+        LoadedPlayer loadedPlayer = playerManager.getLoadedPlayer(e.getPlayer());
+        if (loadedPlayer == null) return;
 
-        if (!e.getBlock().hasMetadata("player_placed") && prisonMinesAPI.getFirstMine(e.getBlock()) != null) {
-            pet.getRewardManager().attemptMiningReward(e.getPlayer(), e.getBlock().getType());
+        if (e.getBlock().hasMetadata("player_placed") || playerManager.getRegionManager().isNotInRewardRegion(RewardType.MINING, e.getBlock())) return;
+
+        PetHolder petHolder = loadedPlayer.getPetHolder();
+
+        for (SelectedPet selectedPet : petHolder.getEntries()) {
+            Pet pet = getFromSelectedPet(selectedPet);
+            if (pet == null) return;
+
+            pet.getRewardManager().attemptMiningReward(loadedPlayer, e.getBlock().getType());
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     private void onEntityKill(EntityDeathEvent e) {
         if (e.getEntity().getKiller() == null) return;
-        Player player = e.getEntity().getKiller();
 
-        Pet pet = getSelectedPet(player);
-        if (pet == null) return;
+        LoadedPlayer loadedPlayer = playerManager.getLoadedPlayer(e.getEntity().getKiller());
+        if (loadedPlayer == null) return;
 
-        pet.getRewardManager().attemptKillReward(player, e.getEntityType());
+        if (playerManager.getRegionManager().isNotInRewardRegion(RewardType.KILLING, e.getEntity().getLocation())) return;
+
+        PetHolder petHolder = loadedPlayer.getPetHolder();
+
+        for (SelectedPet selectedPet : petHolder.getEntries()) {
+            Pet pet = getFromSelectedPet(selectedPet);
+            if (pet == null) return;
+
+            pet.getRewardManager().attemptKillReward(loadedPlayer, e.getEntityType());
+        }
     }
 
     /**
-     * @param player The player's pet to get
-     * @return The player's selected pet. Null if none is selected or the pet ID does not map to a loaded pet.
+     * Gets a Pet for this selected pet
+     * @param selectedPet The selected pet
+     * @return The Pet object associated with this SelectedPet
      */
     @Nullable
-    public Pet getSelectedPet(Player player) {
-        SelectedPet selectedPet = selectedPets.get(player.getUniqueId());
+    public Pet getFromSelectedPet(@Nullable SelectedPet selectedPet) {
         if (selectedPet == null) return null;
-
         return petHashMap.get(selectedPet.getPetID());
-
     }
 
     /**
+     * Reequips all pets for this player
      * @param player The player
-     * @return The amount of xp on this player's selected pet or -1 if no pet is selected
      */
-    public long getSelectedPetXP(Player player) {
-        SelectedPet selectedPet = selectedPets.get(player.getUniqueId());
-        if (selectedPet == null) return -1;
+    private void refreshPetBoosts(Player player) {
+        PetHolder petHolder = playerManager.getSelectedPets(player);
+        if (petHolder == null) return;
 
-        return selectedPet.getXp();
-
+        onPetUpdate(player, petHolder.getEntries(), petHolder.getEntries());
     }
 
     /**
-     * Sets the pet that the player just selected.
-     * If the player deselected a pet, pass a null pet.
-     * Any changes will be pushed to the database
+     * Equips the new pet boosts and un equips the old pet boosts.
      * @param player The player
-     * @param petItemStack The selected pet ItemStack or null
+     * @param oldSelectedPets The old pets list
+     * @param newSelectedPets The new pets list
      */
-    public void onPetSelect(Player player, @Nullable ItemStack petItemStack) {
-        Pet oldPet = getSelectedPet(player);
-        if (oldPet != null) {
-            stopPotionBoosts(player, oldPet);
-        }
-
-        if (petItemStack == null) {
-            selectedPets.remove(player.getUniqueId());
-            Bukkit.getScheduler().scheduleSyncDelayedTask(instance, () -> data.savePlayerInfo(player.getUniqueId(), null));
-        }
-        else {
-            String newPetID = PDCUtils.getPetId(petItemStack);
-            if (newPetID == null || !petHashMap.containsKey(newPetID)) {
-                player.sendMessage(ChatColor.RED + "No pet found for this item. Please alert a staff member!");
-                return;
+    public void onPetUpdate(Player player, @Nullable SelectedPet[] oldSelectedPets, SelectedPet[] newSelectedPets) {
+        // Stop all boosts
+        if (oldSelectedPets != null) {
+            for (SelectedPet oldSelectedPet : oldSelectedPets) {
+                Pet oldPet = getFromSelectedPet(oldSelectedPet);
+                if (oldPet != null) {
+                    stopPetBoosts(player, oldPet);
+                }
             }
+        }
 
-            SelectedPet selectedPet = new SelectedPet(newPetID, Math.max(0, PDCUtils.getXP(petItemStack)));
-            selectedPets.put(player.getUniqueId(), selectedPet);
-            Bukkit.getScheduler().scheduleSyncDelayedTask(instance, () -> data.savePlayerInfo(player.getUniqueId(), selectedPet));
-
-            Pet newPet = petHashMap.get(newPetID);
+        // Restart all boosts
+        for (SelectedPet newSelectedPet : newSelectedPets) {
+            Pet newPet = getFromSelectedPet(newSelectedPet);
             if (newPet != null) {
-                startPotionBoosts(player, newPet);
+                if (newSelectedPet.getPetID().equals("null")) {
+                    player.sendMessage(ChatColor.RED + "No pet found for id=" + newSelectedPet.getPetID() + ". Please alert a staff member!");
+                }
+                else {
+                    startPetBoosts(player, newPet);
+                }
             }
         }
-
-        lastSwapTimeMap.put(player.getUniqueId(), System.currentTimeMillis());
     }
 
     /**
-     * Sets the selected pet for the player.
-     * This method should only be called on player join.
+     * Starts all boosts when this pet is equipped
      * @param player The player
-     * @param selectedPet The selected pet ItemStack or null
+     * @param pet The pet
      */
-    public void onPlayerJoinLoadPet(Player player, @Nullable SelectedPet selectedPet) {
-        if (selectedPet == null) return;
+    private void startPetBoosts(Player player, @Nonnull Pet pet) {
+        startPotionBoosts(player, pet);
+    }
 
-        if (!petHashMap.containsKey(selectedPet.getPetID())) {
-            player.sendMessage(ChatColor.RED + "Invalid saved pet (id=" + selectedPet.getPetID() + " " + "xp=" + selectedPet.getXp() + "). Please alert a staff member!");
-            selectedPets.put(player.getUniqueId(), selectedPet);
-            return;
-        }
+    /**
+     * Stops all boosts when this pet is unequipped
+     * @param player The player
+     * @param pet The pet
+     */
+    private void stopPetBoosts(Player player, @Nonnull Pet pet) {
+        stopPotionBoosts(player, pet);
+    }
 
-        selectedPets.put(player.getUniqueId(), selectedPet);
+    /**
+     * Stops all pet boosts on server shutdown.
+     */
+    private void stopAllBoosts() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            LoadedPlayer lp = playerManager.getLoadedPlayer(player);
+            if (lp == null) return;
 
-        Pet newPet = petHashMap.get(selectedPet.getPetID());
-        if (newPet != null) {
-            startPotionBoosts(player, newPet);
+            PetHolder petHolder = lp.getPetHolder();
+
+            for (SelectedPet selectedPet : petHolder.getEntries()) {
+                Pet oldPet = getFromSelectedPet(selectedPet);
+                if (oldPet != null) {
+                    stopPetBoosts(player, oldPet);
+                }
+            }
         }
     }
 
@@ -767,34 +738,17 @@ public class PetManager implements Listener {
      * Clears all loaded SelectedPet data
      */
     public void clearLoadedData() {
-        selectedPets.clear();
-        lastSwapTimeMap.clear();
-    }
-
-    /**
-     * Determines if the player has swapped their pet too recently
-     * @param player The player
-     * @return If the player cannot swap their pet
-     */
-    public boolean isOnSwapCooldown(Player player) {
-        if (!lastSwapTimeMap.containsKey(player.getUniqueId())) return false;
-        return System.currentTimeMillis() - lastSwapTimeMap.get(player.getUniqueId()) < PET_SWAP_MILLIS_DELAY;
+        for (LoadedPlayer loadedPlayer : playerManager.getPlayers()) {
+            for (SelectedPet selectedPet : loadedPlayer.getPetHolder().getEntries()) {
+                Pet pet = getFromSelectedPet(selectedPet);
+                if (pet != null) stopPetBoosts(loadedPlayer.getPlayer(), pet);
+            }
+            loadedPlayer.resetPlayer();
+        }
     }
 
     public boolean isInvalidPet(String petID) {
         return !petHashMap.containsKey(petID);
-    }
-
-    public boolean hasSelectedPet(Player player) {
-        return selectedPets.containsKey(player.getUniqueId());
-    }
-
-    @Nonnull
-    public String getSelectedPetID(Player player) {
-        if (hasSelectedPet(player)) {
-            return selectedPets.get(player.getUniqueId()).getPetID();
-        }
-        return "";
     }
 
     @Nullable

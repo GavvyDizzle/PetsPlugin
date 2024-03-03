@@ -1,4 +1,7 @@
 id: example
+lockDurationSeconds: 3600 # This locks the pet in the menu for 3600 seconds (the player is unable to remove it)
+permission: petsplugin.pet.example # Empty string will ignore the permission check
+permissionDenied: '&cYou don't have permission to equip this pet'
 item:
   name: '&3Example Pet'
   skullLink: ''
@@ -111,6 +114,12 @@ rewards:
         messages:
           - '&eYou have been given &a$1200'
           - '&eand 12 diamonds!'
+xp:
+  MINING:
+    - STONE
+    - IRON_ORE
+  KILLING:
+    - ZOMBIE
 levels:
   startLevel: 1
   maxLevel: 100

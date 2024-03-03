@@ -1,9 +1,9 @@
 package com.github.gavvydizzle.petsplugin.pets.reward;
 
+import com.github.gavvydizzle.petsplugin.player.LoadedPlayer;
 import com.github.mittenmc.serverutils.Colors;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -26,14 +26,14 @@ public class MiningRewards extends RewardsSet {
 
     /**
      * Attempts to give a reward to the player.
-     * @param player The player
+     * @param loadedPlayer The player
      * @param material The material of the mined block
      */
-    public void giveReward(Player player, Material material) {
+    public void giveReward(LoadedPlayer loadedPlayer, Material material) {
         if (shouldNotGiveReward()) return;
         if (materials != null && !materials.contains(material)) return;
 
-        giveReward(player);
+        giveReward(loadedPlayer);
     }
 
 
