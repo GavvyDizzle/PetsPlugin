@@ -20,3 +20,6 @@ Private requirements are for boost types. They can easily be modified/deleted co
 - PlayerLevels - boost (private)
 - PrisonEnchants - boost (private)
 - RewardsInventory - utility (private)
+
+## Data Storage
+- Supports saving data with MySQL and MariaDB
