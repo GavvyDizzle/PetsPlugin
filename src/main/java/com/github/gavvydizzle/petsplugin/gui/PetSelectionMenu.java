@@ -267,11 +267,9 @@ public class PetSelectionMenu implements ClickableMenu {
         }
 
         SelectedPet[] oldSelectedPets = petHolder.getEntries().clone();
-        System.out.println("OLD: " + Arrays.toString(oldSelectedPets));
         if (petHolder.updateStoredContents(currentItems)) {
             petManager.onPetUpdate(player, oldSelectedPets, petHolder.getEntries());
         }
-        System.out.println("NEW: " + Arrays.toString(petHolder.getEntries()));
         petHolder.onInventoryClose();
         loadedPlayer.getProfileViewers().removeViewer(player.getUniqueId());
 
