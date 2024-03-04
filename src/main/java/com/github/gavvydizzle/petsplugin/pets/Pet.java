@@ -76,7 +76,7 @@ public class Pet implements Comparable<Pet> {
     }
 
     private void initItemStack() {
-        PDCUtils.setPetId(itemStack, this);
+        PDCUtils.setPetId(itemStack, id);
         PDCUtils.setXP(itemStack, 0);
     }
 

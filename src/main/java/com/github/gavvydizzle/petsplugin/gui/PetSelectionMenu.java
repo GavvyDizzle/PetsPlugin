@@ -174,6 +174,14 @@ public class PetSelectionMenu implements ClickableMenu {
                 assert meta != null;
                 meta.setLore(Colors.conv(Collections.singletonList("&7id=" + selectedPet.getPetID())));
                 itemStack.setItemMeta(meta);
+
+                // Adding data to the invalid item is necessary to cause the data to persist
+                PDCUtils.setPetId(itemStack, selectedPet.getPetID());
+                PDCUtils.setOwner(itemStack, loadedPlayer.getUuid());
+                PDCUtils.setXP(itemStack, selectedPet.getXp());
+                PDCUtils.setUseTime(itemStack, selectedPet.getLastUseTime());
+                PDCUtils.setRandomKey(itemStack);
+
                 inventory.setItem(petSlots.get(i), itemStack);
             }
         }
@@ -259,9 +267,11 @@ public class PetSelectionMenu implements ClickableMenu {
         }
 
         SelectedPet[] oldSelectedPets = petHolder.getEntries().clone();
+        System.out.println("OLD: " + Arrays.toString(oldSelectedPets));
         if (petHolder.updateStoredContents(currentItems)) {
             petManager.onPetUpdate(player, oldSelectedPets, petHolder.getEntries());
         }
+        System.out.println("NEW: " + Arrays.toString(petHolder.getEntries()));
         petHolder.onInventoryClose();
         loadedPlayer.getProfileViewers().removeViewer(player.getUniqueId());
 
@@ -488,8 +498,14 @@ public class PetSelectionMenu implements ClickableMenu {
             return;
         }
         else if (petManager.isInvalidPet(petID)) {
-            admin.sendMessage(Messages.invalidPetSelect.replace("{id}", petID));
-            Sounds.generalFailSound.playSound(admin);
+            if (e.isRightClick()) {
+                e.setCancelled(false);
+            }
+            else {
+                admin.sendMessage(Messages.invalidPetSelect.replace("{id}", petID));
+                admin.sendMessage(ChatColor.YELLOW + "" + ChatColor.ITALIC + " - Admins can bypass invalid items with a right-click");
+                Sounds.generalFailSound.playSound(admin);
+            }
             return;
         }
 
@@ -503,8 +519,8 @@ public class PetSelectionMenu implements ClickableMenu {
 
             // Allow admins to bypass the GPU lock with a right-click
             if (millisRemaining > 0 && !e.isRightClick()) {
-                e.getWhoClicked().sendMessage(lockedPetMessage.replace("{time}", Numbers.getTimeFormatted((int) (millisRemaining / 1000))));
-                e.getWhoClicked().sendMessage(ChatColor.YELLOW + "" + ChatColor.ITALIC + " - Admins can bypass this lock with a right-click");
+                admin.sendMessage(lockedPetMessage.replace("{time}", Numbers.getTimeFormatted((int) (millisRemaining / 1000))));
+                admin.sendMessage(ChatColor.YELLOW + "" + ChatColor.ITALIC + " - Admins can bypass this lock with a right-click");
                 Sounds.generalFailSound.playSound((Player) e.getWhoClicked());
                 e.setCancelled(true);
                 return;

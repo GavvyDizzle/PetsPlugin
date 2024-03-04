@@ -127,7 +127,7 @@ public class PetManager implements Listener {
                 String newPetID = selectedPet.getPetID();
                 if (newPetID == null || isInvalidPet(newPetID)) {
                     loadedPlayer.sendMessage(Messages.petInvalidAfterReload.replace("{id}", selectedPet.getPetID()));
-                    return;
+                    continue;
                 }
 
                 Pet newPet = petHashMap.get(newPetID);

@@ -52,11 +52,6 @@ public class OpenPlayerMenu extends SubCommand {
             }
         }
 
-        if (player.getUniqueId().equals(destination.getUniqueId())) {
-            sender.sendMessage(ChatColor.RED + "Unable to view your own menu with this command");
-            return;
-        }
-
         LoadedPlayer loadedPlayer = playerManager.getOnlineOrOfflinePlayer(destination.getUniqueId());
         if (loadedPlayer != null) {
             inventoryManager.getPetMenu().adminOpenInventory(player, loadedPlayer);

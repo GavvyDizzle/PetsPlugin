@@ -51,13 +51,13 @@ public class PDCUtils {
     /**
      * Sets the pet ID of this item
      * @param item The ItemStack
-     * @param pet The Pet
+     * @param id The pet ID
      */
-    public static void setPetId(@NotNull ItemStack item, @NotNull Pet pet) {
+    public static void setPetId(@NotNull ItemStack item, @NotNull String id) {
         if (item.getItemMeta() == null) return;
 
         ItemMeta meta = item.getItemMeta();
-        meta.getPersistentDataContainer().set(petIdKey, PersistentDataType.STRING, pet.getId());
+        meta.getPersistentDataContainer().set(petIdKey, PersistentDataType.STRING, id);
         item.setItemMeta(meta);
     }
 
