@@ -11,7 +11,7 @@ Interested in using this plugin? Check out the documentation in the `/docs` fold
 - Pet selection is done through a user-friendly GUI
 
 ## Requirements
-- ServerUtils 1.0.8+
+- ServerUtils 1.0.10+
 - WorldGuard
 
 ## Optional Dependencies

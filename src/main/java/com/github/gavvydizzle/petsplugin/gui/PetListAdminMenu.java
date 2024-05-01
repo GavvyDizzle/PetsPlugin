@@ -3,11 +3,10 @@ package com.github.gavvydizzle.petsplugin.gui;
 import com.github.gavvydizzle.petsplugin.pets.Pet;
 import com.github.gavvydizzle.petsplugin.pets.PetManager;
 import com.github.gavvydizzle.petsplugin.utils.Sounds;
-import com.github.mittenmc.serverutils.gui.PagesMenu;
+import com.github.mittenmc.serverutils.gui.pages.PagesMenu;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.inventory.ItemStack;
 
 /**
  * Admin only menu that lists all loaded pets
@@ -51,19 +50,9 @@ public class PetListAdminMenu extends PagesMenu<Pet> {
      */
     @Override
     public void onItemClick(InventoryClickEvent e, Player player, Pet item) {
-        player.getInventory().addItem(item.getItemStack(player, 0));
+        super.onItemClick(e, player, item);
+
         player.sendMessage(ChatColor.GREEN + "You received a new " + item.getId() + " pet");
         Sounds.generalClickSound.playSound(player);
-    }
-
-    /**
-     * Called when an item is added to the inventory.
-     * @param item The generic item belonging to this inventory
-     * @param player The player who will view this item
-     * @return The resulting ItemStack
-     */
-    @Override
-    public ItemStack onItemAdd(Pet item, Player player) {
-        return item.getAdminPetListItemStack();
     }
 }

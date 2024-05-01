@@ -7,6 +7,7 @@ import com.github.gavvydizzle.petsplugin.pets.xp.ExperienceType;
 import com.github.gavvydizzle.petsplugin.utils.PDCUtils;
 import com.github.mittenmc.serverutils.Colors;
 import com.github.mittenmc.serverutils.Numbers;
+import com.github.mittenmc.serverutils.gui.pages.ItemGenerator;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -18,7 +19,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Pet implements Comparable<Pet> {
+public class Pet implements Comparable<Pet>, ItemGenerator {
 
     private final Pattern pattern = Pattern.compile("\\{boost_[A-Za-z0-9]+}");
     private final Pattern patternWithLevel = Pattern.compile("\\{boost_[A-Za-z0-9]+_[0-9]+}");
@@ -203,6 +204,16 @@ public class Pet implements Comparable<Pet> {
         ItemMeta meta = itemStack.getItemMeta();
         assert meta != null;
         return meta.getDisplayName().replace("{lvl}", String.valueOf(level));
+    }
+
+    @Override
+    public @NotNull ItemStack getMenuItem(Player player) {
+        return getAdminPetListItemStack();
+    }
+
+    @Override
+    public @Nullable ItemStack getPlayerItem(Player player) {
+        return getItemStack(player, 0);
     }
 
     /**

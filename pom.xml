@@ -6,7 +6,7 @@
 
     <groupId>com.github.gavvydizzle</groupId>
     <artifactId>PetsPlugin</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <packaging>jar</packaging>
 
     <name>PetsPlugin</name>
@@ -83,7 +83,7 @@
         <dependency>
             <groupId>com.github.mittenmc</groupId>
             <artifactId>ServerUtils</artifactId>
-            <version>1.0.8</version>
+            <version>1.0.10</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
